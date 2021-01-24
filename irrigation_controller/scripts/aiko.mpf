@@ -1,0 +1,69 @@
+exec print("### Make directories ###")
+md applications
+# md applications/step_patterns
+md configuration
+md examples
+md lib
+md lib/aiko
+# md lib/umqtt
+
+exec print("### Copy applications/*.py ###")
+# put applications/nodebots.py
+put applications/default.py
+# put applications/step_controller.py
+# put applications/step_patterns/cchs_1.py
+# put applications/step_patterns/skipping_girl.py
+# put applications/swagbadge.py
+put applications/irrigation_controller.py
+
+exec print("### Copy configuration/*.py ###")
+put configuration/keys.db
+put configuration/led.py
+# put configuration/lolibot.py
+put configuration/main.py
+put configuration/mqtt.py
+put configuration/net.py
+put configuration/oled.py
+put configuration/services.py
+put configuration/system_ui.py
+
+exec print("### Copy lib/aiko/*.py ###")
+put lib/aiko/button.py
+put lib/aiko/common.py
+put lib/aiko/delayed_action.py
+put lib/aiko/event.py
+put lib/aiko/led.py
+put lib/aiko/mqtt.py
+put lib/aiko/net.py
+put lib/aiko/oled.py
+put lib/aiko/ping.py
+put lib/aiko/queue.py
+put lib/aiko/reboot.py
+put lib/aiko/services.py
+put lib/aiko/system_ui.py
+put lib/aiko/test.py
+put lib/aiko/upgrade.py
+put lib/aiko/update_file.py
+put lib/aiko/web_client.py
+put lib/aiko/web_server.py
+
+# exec print("### Copy lolibot.py ###")
+# put lib/lolibot.py
+
+exec print("### Copy lib/*.py ###")
+put lib/mpu9250.py
+put lib/shutil.py
+put lib/ssd1306.py
+put lib/threading.py
+
+# exec print("### Copy lib/umqtt ###")
+# put lib/umqtt/simple.py
+# put lib/umqtt/robust.py
+
+# print("### Copy play.py ###")
+# put play.py
+
+exec print("### Copy main.py ###")
+put main.py
+
+exec print("### Complete ###")

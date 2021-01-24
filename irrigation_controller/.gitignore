@@ -1,0 +1,5 @@
+firmware/
+micropython-lib/
+z_*
+# contains wifi passwords
+configuration/net.py
