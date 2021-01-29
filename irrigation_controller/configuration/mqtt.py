@@ -4,8 +4,8 @@ upgrade_topic = "upgrade/aiko_00"
 topic_path = "irrigation_controller"
 
 settings = {
-  # TODO load farm server IP from file outside of git
-  "host":              "192.168.1.13",
+  # TODO reference farm server IP from repo-wide config
+  "host":              "192.168.1.9",
   "keepalive":         60,
   "port":              1883,
   "topic_path":        topic_path,

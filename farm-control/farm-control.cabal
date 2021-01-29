@@ -1,11 +1,11 @@
-name: farm-haskell
+name: farm-control
 version: 0.0.1
 license: GPL3
 license-file: LICENSE
 cabal-version: >= 1.18
 build-type: Simple
 
-executable farm-haskell
+executable farm-control
     build-depends: base < 5, containers, bytestring, text, time, network-uri,
       net-mqtt, aeson, optparse-generic, utf8-string
     main-is: Main.hs
