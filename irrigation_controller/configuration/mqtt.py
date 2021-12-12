@@ -5,7 +5,7 @@ topic_path = "irrigation_controller"
 
 settings = {
   # TODO reference farm server IP from repo-wide config
-  "host":              "192.168.1.9",
+  "host":              "192.168.1.15",
   "keepalive":         60,
   "port":              1883,
   "topic_path":        topic_path,

@@ -8,7 +8,7 @@
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
-  networking.hostName = "farm-server-z230";
+  networking.hostName = "farm-server";
   networking.networkmanager.enable = true;
 
   # The global useDHCP flag is deprecated, therefore explicitly set to false here.
@@ -51,6 +51,31 @@
     forwardX11 = false;
   };
 
+  # Setup dynamic DNS
+  # The dynamic dns url with username and password embedded is copied to
+  # /run/keys/dynamic-dns-url on the target machine by nixops. This means if the
+  # machine is rebooted, it will lose this key and have to be redeployed.
+  # The dynamic-dns url needs to match the Host in your ssh config for deployment.targetHost
+  # defined in the nixops deployment.
+  deployment.keys.dynamic-dns-url = {
+      text = builtins.readFile ./dynamic-dns-url.txt;
+      user = "rowan";
+      group = "wheel";
+      permissions = "0640";
+  };
+  systemd.services.dynamic-dns = {
+    serviceConfig.Type = "oneshot";
+    script = ''
+        RESPONSE="$(${pkgs.curl}/bin/curl --silent $(cat /run/keys/dynamic-dns-url))"
+        echo "$(date -Iseconds) ''${RESPONSE}" >> /var/log/dynamic-dns.log
+    '';
+  };
+  systemd.timers.dynamic-dns = {
+    wantedBy = [ "timers.target" ];
+    partOf = [ "dynamic-dns.service" ];
+    timerConfig.OnCalendar = "*-*-* *:*:00";
+  };
+
   # Open ports in the firewall.
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
@@ -82,6 +107,7 @@
     openssh.authorizedKeys.keys = [
         "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC3oUx8oe0xQDKP9sw602ku4wOhP9AKLXNsGDARyLdw+MbBzGJTNFUvh6fj77fWYTqHlDnrfgoBlc5mS0uY9KUP/28PjfyqdIkGdhbfE403+vp4a1JMAnVv7xV6n3PYtiUYIF5hwCSzeiibIhQsCTsJGtMoiECdRpOvqCD11m6kTA1j5xlajEnvnNg7k7W+MaZWaqeuvEn0Vi7tu+Ia6xvnfkKwph9VpVuMsTrAy0y36pSpglax2yKEV53lt8ZGnasJiOu2fv2yT6np9qGizU2I8ccC5G9nNCkYHJsE2q1ogjdltva6oexCOJzLwMVZCC6UVTHej0494ipY35JSJmh3TW6oG8ddhdUdurPQNaw/w5tiUZwEG3640Ts3TbIJ0sagi1+l5TBRpW7wsgU8VbTyBvsMszXj46xri4jleESPVjr820CRnt27l2Dt/DGpdZHvhbB3endb0NkEqfMb/44SP6mXceT10GIBiCl110/7n7qehXyr1qt88VZ6QVbige9ts9NVkoNYkBrxaHq4ooa8IV9leO52m0X7BLDYSEUYBMFWx3lc7vbyvCV382gsfTQA/CtBHmEUTlljSQS7ZDOXwiSZYXeDKtafDTRNBrWr3HikgjnqMK2OjLU/y3nyoVtE9FzLANWuxwhJIld9S44QWZA82LsnrW/hQfXp7Y4VyQ== rowan@rowanX220"
     ];
+    shell = "/run/current-system/sw/bin/fish";
   };
 
   nix.trustedUsers = [ "root" "rowan" ];

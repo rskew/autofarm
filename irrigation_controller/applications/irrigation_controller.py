@@ -37,7 +37,7 @@ farm_thing_controls = {
 
 def on_farm_verb(topic, message_raw):
     '''
-    Act on farm control messages defined in `farm-haskell/Farm/Control.hs`
+    Act on farm control messages defined in `../../farm-control/Main.hs`
     '''
     print(topic, message_raw)
     farmVerb = topic.split('/')[0]
@@ -53,14 +53,14 @@ def on_farm_verb(topic, message_raw):
         farm_thing_controls[farm_thing]["OFF"]()
     elif start_stop == "start":
         farm_thing_controls[farm_thing]["ON"]()
-        def closure():
+        def off_action():
             farm_thing_controls[farm_thing]["OFF"]()
             aiko.mqtt.client.publish(
                 configuration.mqtt.settings["topic_path"] + "/ack/" + topic,
                 "stop " + farm_thing,
             )
         delayed_action(
-            closure,
+            off_action,
             message["duration"] * 1000,
             farm_thing,
             message["timestamp"],

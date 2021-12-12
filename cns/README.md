@@ -8,4 +8,20 @@
 
 ## Stuff you'll want to update in the config
 - dynamic dns configuration in `farm-cns.nix`
-  - uses `freedns.afraid.org` with credentials in git-ignored `cns/dynamic-dns-url.txt`
+  - uses `freedns.afraid.org` with credentials in git-ignored `machines/dynamic-dns-url.txt`
+
+## Commands to run manually on farm server
+Paste these into the terminal of the farm server to make things happen
+
+``` sh
+farm-control start --farmVerb "Pump BorePump" --duration 60
+farm-control start --farmVerb "Irrigate TopRow" --duration 1800
+farm-control start --farmVerb "Irrigate PolyTunnel" --duration 1800
+farm-control start --farmVerb "Irrigate Pumpkins" --duration 1800
+```
+
+## Viewing MQTT logs
+
+``` sh
+mosquitto_sub --host <farm-cns-host> --port 1883 -v -t '#'
+```

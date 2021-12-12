@@ -1,4 +1,4 @@
-Irrigation controller written in Micropython build on the Aiko framework.
+Irrigation controller written in Micropython built on the Aiko framework.
 
 - http://micropython.org
 - https://github.com/geekscape/aiko_engine_mp

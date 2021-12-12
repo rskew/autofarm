@@ -102,7 +102,7 @@ main = do
       publishMessage topic $ (toString . encode) msg
     Ping farmNode -> do
       let
-        topic = (show farmNode) ++ "/ping"
+        topic = (farmNodeTopic farmNode) ++ "/ping"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now)]
       publishMessage topic $ (toString . encode) msg
