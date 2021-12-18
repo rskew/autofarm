@@ -13,5 +13,5 @@ mkDerivation {
     optparse-generic
     utf8-string
   ];
-  license = stdenv.lib.licenses.gpl3;
+  license = pkgs.lib.licenses.gpl3;
 }

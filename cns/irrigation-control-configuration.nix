@@ -1,5 +1,9 @@
 { config, lib, pkgs, ... }:
 
+let
+    farm-control = (import ../farm-control/default.nix { inherit pkgs; }).farm-control;
+in
+
 {
   environment.systemPackages = with pkgs; [
     farm-control
@@ -8,13 +12,15 @@
   # Setup MQTT broker
   services.mosquitto = {
     enable = true;
-    host = "0.0.0.0";
-    port = 1883;
-    allowAnonymous = true;
-    aclExtraConf = ''
-      topic readwrite #
-    '';
-    users = {};
+    listeners = [{
+      address = "0.0.0.0";
+      port = 1883;
+      acl = [ "topic readwrite #" ];
+      omitPasswordAuth = true;
+      settings = {
+        allow_anonymous = true;
+      };
+    }];
   };
   networking.firewall.allowedTCPPorts = [ 1883 ];
   systemd.services.log_mqtt = {
