@@ -1,10 +1,5 @@
 let
-  # TODO centrally pin nixpkgs repo-wide
-  # Latest master on 2021-03-02
-  #pkgs-src = fetchTarball "https://github.com/NixOS/nixpkgs/archive/80308388cd77ee58823c9b6f24b46892cd359145.tar.gz";
-  #pkgs = import pkgs-src {};
-  # Use local version of nixpkgs pending PR: https://github.com/NixOS/nixpkgs/pull/115381
-  pkgs = import ../../nixpkgs {};
+  pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/nixos-20.09.tar.gz") {};
 
   nixops-src = pkgs.fetchFromGitHub {
     owner = "NixOS";

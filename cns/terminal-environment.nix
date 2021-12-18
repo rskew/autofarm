@@ -4,6 +4,7 @@
   environment.systemPackages = with pkgs; [
     #utilities
     htop
+    git
 
     # For nicer terminal experience over ssh
     rxvt_unicode

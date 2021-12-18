@@ -3,8 +3,9 @@
 - Give machine a fixed address (e.g. modify router config to give server a static IP on the local network via DHCP reservation).
   Add this address to the global config so that nodes can find the MQTT broker running on the server.
   TODO: currently hard-coded
-- Deploy machine config in `farm-cns.nix` to the machine using nixops
-  - `nixops create farm-cns.nix -d farm-cns; nixops deploy -d farm-cns`
+#- Deploy machine config in `farm-cns.nix` to the machine using nixops
+#  - `nixops create farm-cns.nix -d farm-cns; nixops deploy -d farm-cns`
+- SSH into the machine and confiugre as the farm server by symlinking /etc/nixos/configuration.nix to ./farm-server-configuration.nix
 
 ## Stuff you'll want to update in the config
 - dynamic dns configuration in `farm-cns.nix`

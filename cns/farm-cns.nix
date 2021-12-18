@@ -10,7 +10,7 @@ in
     {
       # "farm_server" should refer to an entry in your ssh config file
       # with the ssh key authorized on host (i.e. you should already be able to `ssh farm_server` using an ssh key)
-      deployment.targetHost = "farm_server";
+      deployment.targetHost = "farm_server.local";
       deployment.targetUser = "rowan";
       deployment.provisionSSHKey = false;
       # deploying with non-root targetUser requires target user to have
