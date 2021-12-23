@@ -67,7 +67,11 @@ def wifi_connect(wifi):
   sta_if.active(True)
   oled.set_annunciator(common.ANNUNCIATOR_WIFI, "s", True)
   common.log("WiFi scan")
-  aps = sta_if.scan()
+  try:
+      # This seems to throw an exception which crashed the net thread when no networks can be found :/
+      aps = sta_if.scan()
+  except:
+      aps = []
 
   for ap in aps:  # Note 1
     for ssid in wifi:
@@ -138,11 +142,12 @@ def net_thread():
       wifi_disconnect(sta_if)
       set_status(led.red)
       oled.set_annunciator(common.ANNUNCIATOR_WIFI, " ", True)
+    # Never go into AP mode, keep trying to connect to confiugred WIFI networks
 # TODO: If Wi-Fi disconnect, then retry Wi-Fi before going to Wi-Fi AP mode
-    ssid_password = aiko.web_server.wifi_configure(wifi)
-    if len(ssid_password[0]):
-      wifi.insert(0, ssid_password)
-      wifi_configuration_updated = True
+    #ssid_password = aiko.web_server.wifi_configure(wifi)
+    #if len(ssid_password[0]):
+    #  wifi.insert(0, ssid_password)
+    #  wifi_configuration_updated = True
 
 def initialise():
 # event.add_timer_handler(net_led_handler, 100)  # 10 Hz
