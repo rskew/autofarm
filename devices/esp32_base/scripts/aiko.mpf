@@ -15,6 +15,7 @@ put applications/default.py
 # put applications/step_patterns/skipping_girl.py
 # put applications/swagbadge.py
 put applications/irrigation_controller.py
+put applications/solar_test.py
 
 exec print("### Copy configuration/*.py ###")
 put configuration/keys.db
@@ -36,7 +37,7 @@ put lib/aiko/led.py
 put lib/aiko/mqtt.py
 put lib/aiko/net.py
 put lib/aiko/oled.py
-put lib/aiko/ping.py
+put lib/aiko/ping_server.py
 put lib/aiko/queue.py
 put lib/aiko/reboot.py
 put lib/aiko/services.py

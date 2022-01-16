@@ -10,7 +10,7 @@ def delayed_action(action, wait_ms, action_name, action_id):
     for the same name.
     Note: A timestamp makes a great action_id when creating a delayed_action.
     '''
-    def action():
+    def closure():
         global most_recent_update
         most_recent_update[action_name] = action_id
         time.sleep(wait_ms / 1000.)
@@ -19,4 +19,4 @@ def delayed_action(action, wait_ms, action_name, action_id):
             action()
         else:
             print("Not performing overridden action: " + action_name)
-    Thread(target=action).start()
+    Thread(target=closure).start()

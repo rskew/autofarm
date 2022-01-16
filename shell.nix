@@ -1,5 +1,5 @@
 { pkgs ? import <nixos> {} }:
-pkgs.stdenv.mkDerivation {
+pkgs.mkShell {
   name = "farm-control";
 
   buildInputs = [

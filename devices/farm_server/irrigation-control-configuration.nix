@@ -2,6 +2,7 @@
 
 let
     farm-control = (import ../farm-control/default.nix { inherit pkgs; }).farm-control;
+    farm-logger = (import ../farm-logger/default.nix { inherit pkgs; });
 in
 
 {
@@ -29,7 +30,8 @@ in
     requires = [ "mosquitto.service" ];
     after = [ "mosquitto.service" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -c \"${pkgs.mosquitto}/bin/mosquitto_sub --host localhost --port 1883 -v -t '#' >> /var/log/mqtt.out\"";
+      #ExecStart = "${pkgs.bash}/bin/bash -c \"${pkgs.mosquitto}/bin/mosquitto_sub --host localhost --port 1883 -v -t '#' >> /var/log/mqtt.out\"";
+      ExecStart = "${farm-logger}/bin/farm-logger --logFile /var/log/mqtt.out";
       Restart = "on-failure";
       User = "root";
     };

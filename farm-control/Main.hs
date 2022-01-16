@@ -52,6 +52,7 @@ farmVerbTopic = \case
 data FarmNode
   = IrrigationController
   | BorePumpController
+  | TankMonitor
   deriving (Generic, Show, Read)
 instance ParseRecord FarmNode
 instance ParseFields FarmNode
@@ -61,6 +62,7 @@ farmNodeTopic :: FarmNode -> String
 farmNodeTopic = \case
   IrrigationController -> "irrigation_controller"
   BorePumpController -> "bore_pump_controller"
+  TankMonitor -> "tank_monitor"
 
 data Action
   = Start {farmVerb :: FarmVerb, duration :: Integer}
@@ -76,12 +78,12 @@ instance ParseField Action
 jsonInt :: Integer -> Aeson.Value
 jsonInt = Aeson.Number . fromInteger
 
-publishMessage :: String -> String -> IO ()
-publishMessage topic message = do
+publishMessage :: String -> String -> Bool -> IO ()
+publishMessage topic message retain = do
   let (Just uri) = parseURI mqttServer
   mc <- connectURI mqttConfig uri
   putStrLn $ topic ++ " " ++ message
-  publish mc (pack topic) (BL.pack message) False
+  publish mc (pack topic) (BL.pack message) retain
 
 main :: IO ()
 main = do
@@ -93,29 +95,29 @@ main = do
         topic = (farmVerbTopic farmVerb) ++ "/start"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now), ("duration", jsonInt duration)]
-      publishMessage topic $ (toString . encode) msg
+      publishMessage topic ((toString . encode) msg) False
     Stop farmVerb -> do
       let
         topic = (farmVerbTopic farmVerb) ++ "/stop"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now)]
-      publishMessage topic $ (toString . encode) msg
+      publishMessage topic ((toString . encode) msg) False
     Ping farmNode -> do
       let
         topic = (farmNodeTopic farmNode) ++ "/ping"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now)]
-      publishMessage topic $ (toString . encode) msg
+      publishMessage topic ((toString . encode) msg) False
     Reboot farmNode -> do
       let
         topic = (farmNodeTopic farmNode) ++ "/reboot"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now)]
-      publishMessage topic $ (toString . encode) msg
+      publishMessage topic ((toString . encode) msg) True
     UpdateFile farmNode filename -> do
       let
         topic = (farmNodeTopic farmNode) ++ "/update_file/" ++ filename
       -- TODO don't asume user is running from farm-haskell folder
-      handle <- openFile ("../irrigation_controller/" ++ filename) ReadMode
+      handle <- openFile filename ReadMode
       msg <- hGetContents handle
-      publishMessage topic msg
+      publishMessage topic msg True

@@ -1,11 +1,11 @@
-name: farm-control
+name: farm-logger
 version: 0.0.1
 license: GPL-3
 license-file: LICENSE
 cabal-version: >= 1.18
 build-type: Simple
 
-executable farm-control
+executable farm-logger
     build-depends: base < 5, containers, bytestring, text, time, network-uri,
       net-mqtt, aeson, optparse-generic, utf8-string
     main-is: Main.hs
