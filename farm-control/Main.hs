@@ -103,12 +103,10 @@ main = do
       case farmVerb of
         -- Delegate starting the BorePump to the farm-monitor.
         -- The farm-monitor will switch off the pump when the tank is filled.
-        Pump BorePump -> do
-          let
-            (Just uri) = parseURI mqttServer
-            redirectedTopic = "farm_monitor/in/pump/BorePump/start"
-          publishMessage redirectedTopic ((toString . encode) msg) False
-        _ -> publishMessage topic ((toString . encode) msg) False
+        Pump BorePump ->
+          publishMessage "farm_monitor/in/pump/BorePump/start" ((toString . encode) msg) False
+        _ ->
+          publishMessage topic ((toString . encode) msg) False
     Stop farmVerb -> do
       let
         topic = (farmVerbTopic farmVerb) ++ "/in/stop"
