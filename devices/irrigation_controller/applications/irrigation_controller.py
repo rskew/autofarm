@@ -80,7 +80,6 @@ def on_farm_verb(topic, message_raw):
     '''
     print(topic, message_raw)
     farmVerb = topic.split('/')[0]
-    message = json.loads(message_raw)
     # We could switch on irrigate vs pump root topics, but no point atm
     # as they are handled the same.
     farm_thing, start_stop = topic.split('/')[1:3]
@@ -93,6 +92,7 @@ def on_farm_verb(topic, message_raw):
         farm_devices[farm_thing].off()
     elif start_stop == "start":
         #farm_thing_controls[farm_thing]["ON"]()
+        message = json.loads(message_raw)
         farm_devices[farm_thing].on()
         def off_action():
             #farm_thing_controls[farm_thing]["OFF"]()

@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Main where
 
+import Control.Exception (IOException, catch)
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.ByteString.Lazy.UTF8 (toString)
 import Data.List (intercalate)
@@ -14,6 +15,7 @@ import Data.Time
 import Network.MQTT.Client
 import Network.URI
 import Options.Generic
+import System.IO
 
 import Farm.Config
 
@@ -22,11 +24,15 @@ data Options = Options {logFile :: String}
 instance ParseRecord Options
 
 mqttCallback :: String -> MQTTClient -> Topic -> BL.ByteString -> [Property] -> IO ()
-mqttCallback logFile _ topic message properties = do
+mqttCallback logFile mqttclient topic message properties = do
   now <- getZonedTime
   -- Format time including milliseconds
   let nowStr = take 23 $ formatTime defaultTimeLocale "%F %T%Q" now
-  appendFile logFile $ intercalate " " [nowStr, unpack topic, toString message, "\n"]
+  catch (appendFile logFile $ intercalate " " [nowStr, unpack topic, toString message, "\n"])
+      (\e -> do let err = show (e :: IOException)
+                hPutStr stderr ("Warning: Couldn't open " ++ logFile ++ ": " ++ err)
+                _ <- mqttCallback logFile mqttclient topic message properties
+                return ())
 
 main = do
   Options logFile <- (getRecord "Farm logger") :: IO Options

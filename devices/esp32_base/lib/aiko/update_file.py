@@ -13,7 +13,7 @@ def on_update_file_message(topic, payload):
   '''
   Single-file upgrade
   '''
-  filename = '/'.join(topic.split('/')[2:])
+  filename = '/'.join(topic.split('/')[3:])
   if payload != ACK_MESSAGE(filename):
       print("Updating file " + filename)
       shutil.make_directories(filename)
