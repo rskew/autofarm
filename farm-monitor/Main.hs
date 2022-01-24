@@ -34,13 +34,13 @@ mqttCallback tankFullMVar mqttclient topic message properties = do
   case (unpack topic, BL.unpack message) of
     ("tank_monitor/out/tank_level", "FULL") -> do
       putStrLn "Tank is full, stopping bore pump"
-      publishMessage "pump/BorePump/stop" "{}"
+      publishMessage "irrigation_controller/in/pump/BorePump/stop" "{}"
       swapMVar tankFullMVar True
       return ()
     ("tank_monitor/out/tank_level", _) -> do
       swapMVar tankFullMVar False
       return ()
-    ("farm_monitor/in/pump/BorePump/start", _) -> do
+    ("farm_monitor/in/pump/BorePump/start", message_str) -> do
       tankFull <- readMVar tankFullMVar
       if tankFull
       then do
@@ -48,7 +48,7 @@ mqttCallback tankFullMVar mqttclient topic message properties = do
         return ()
       else do
         putStrLn "Tank not full, starting bore pump"
-        publishMessage "pump/BorePump/start" $ BL.unpack message
+        publishMessage "irrigation_controller/in/pump/BorePump/start" message_str
         return ()
     _ -> return ()
 
@@ -56,5 +56,7 @@ main = do
   let (Just uri) = parseURI mqttServer
   tankFullMVar <- newMVar True
   mc <- connectURI mqttConfig{_msgCB=SimpleCallback $ mqttCallback tankFullMVar} uri
-  subscribe mc [("#", subOptions)] []
+  subscribe mc [("tank_monitor/out/tank_level", subOptions),
+                ("farm_monitor/in/pump/BorePump/start", subOptions)
+               ] []
   waitForClient mc   -- wait for the the client to disconnect

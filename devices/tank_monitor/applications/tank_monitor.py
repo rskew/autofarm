@@ -65,15 +65,13 @@ class TankMonitor():
     WET = "WET"
     DRY = "DRY"
 
+    FULL = "FULL"
+    EMPTY = "EMPTY"
+    MIDDLE = "MIDDLE"
+
     def __init__(self, low_level_switch_pin, high_level_switch_pin):
         self.low_level_switch_pin = Pin(low_level_switch_pin, Pin.IN, Pin.PULL_UP)
         self.high_level_switch_pin = Pin(high_level_switch_pin, Pin.IN, Pin.PULL_UP)
-
-    def wake_on_critical(self):
-        """Use wake_on_ext0 and wake_on_ext1 to allow having two switches,
-        one with each critical state."""
-        esp32.wake_on_ext0(pin=self.high_level_switch_pin, level=esp32.WAKEUP_ANY_HIGH)
-        esp32.wake_on_ext1(pins=[self.low_level_switch_pin], level=esp32.WAKEUP_ALL_LOW)
 
     def _read_pin(self, pin):
         if pin.value() == 0:
@@ -81,20 +79,29 @@ class TankMonitor():
         else:
             return TankMonitor.WET
 
+    def read(self):
+        low_level = self._read_pin(self.low_level_switch_pin)
+        high_level = self._read_pin(self.high_level_switch_pin)
+        if high_level == TankMonitor.WET:
+            return TankMonitor.FULL
+        elif low_level == TankMonitor.WET:
+            return TankMonitor.MIDDLE
+        else:
+            return TankMonitor.EMPTY
+
     def critical(self):
-        return (
-            self.read_low_level_switch() == TankMonitor.DRY
-            or
-            self.read_high_level_switch() == TankMonitor.WET
-        )
+        return self.read() in [TankMonitor.FULL, TankMonitor.EMPTY]
 
-    def read_low_level_switch(self):
-        return self._read_pin(self.low_level_switch_pin)
+    def wake_on_critical(self):
+        """Use wake_on_ext0 and wake_on_ext1 to allow having two switches,
+        one with each critical state."""
+        esp32.wake_on_ext0(pin=self.high_level_switch_pin, level=esp32.WAKEUP_ANY_HIGH)
+        esp32.wake_on_ext1(pins=[self.low_level_switch_pin], level=esp32.WAKEUP_ALL_LOW)
 
-    def read_high_level_switch(self):
-        return self._read_pin(self.high_level_switch_pin)
-
-tank_monitor = TankMonitor(low_level_switch_pin=25, high_level_switch_pin=27)
+tank_monitor = TankMonitor(
+    low_level_switch_pin=27,
+    high_level_switch_pin=25,
+)
 
 def monitor_tank_level():
     start_time = time.time()
@@ -121,13 +128,8 @@ def monitor_tank_level():
 
         print("publishing tank level")
         publish_with_retries(
-            device_name + "/tank_level/out/low_level_switch",
-            tank_monitor.read_low_level_switch(),
-            retries=retries,
-        )
-        publish_with_retries(
-            device_name + "/tank_level/out/high_level_switch",
-            tank_monitor.read_high_level_switch(),
+            device_name + "/out/tank_level",
+            tank_monitor.read(),
             retries=retries,
         )
         publish_with_retries(

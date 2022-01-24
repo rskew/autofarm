@@ -97,7 +97,7 @@ main = do
   case x of
     Start farmVerb duration -> do
       let
-        topic = (farmVerbTopic farmVerb) ++ "/in/start"
+        topic = (farmNodeTopic IrrigationController) ++ "/in/" ++ (farmVerbTopic farmVerb) ++ "/start"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now), ("duration", jsonInt duration)]
       case farmVerb of
@@ -109,7 +109,7 @@ main = do
           publishMessage topic ((toString . encode) msg) False
     Stop farmVerb -> do
       let
-        topic = (farmVerbTopic farmVerb) ++ "/in/stop"
+        topic = (farmNodeTopic IrrigationController) ++ "/in/" ++ (farmVerbTopic farmVerb) ++ "/stop"
         msg :: Map Text Aeson.Value
         msg = Map.fromList [("timestamp", jsonInt now)]
       publishMessage topic ((toString . encode) msg) False
