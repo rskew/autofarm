@@ -1,8 +1,9 @@
 { config, lib, pkgs, ... }:
 
 let
-    farm-control = (import ../farm-control/default.nix { inherit pkgs; }).farm-control;
-    farm-logger = (import ../farm-logger/default.nix { inherit pkgs; });
+    farm-control = import ../farm-control/default.nix { inherit pkgs; };
+    farm-logger = import ../farm-logger/default.nix { inherit pkgs; };
+    farm-monitor = import ../farm-monitor/default.nix { inherit pkgs; };
 in
 
 {
@@ -37,13 +38,26 @@ in
     };
   };
 
+  systemd.services.farm-monitor = {
+    description = "Farm monitor stops pump when tank is full";
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "mosquitto.service" ];
+    after = [ "mosquitto.service" ];
+    serviceConfig = {
+      ExecStart = "${farm-monitor}/bin/farm-monitor";
+      Restart = "on-failure";
+      User = "root";
+    };
+  };
+
   # Run the bore pump in the afternoon when the sun is shining on the solar panels
   systemd.services.run_bore_pump = {
     serviceConfig.Type = "oneshot";
     # Run every third day
     #script = "${pkgs.bash}/bin/bash -c '(( $(date +\%s)/ 86400 \% 3 == 0 )) && ${farm-control}/bin/farm-control start --farmVerb \"Pump BorePump\" --duration 900 >> /var/log/farm_control_log.out || echo only run every third day'";
     # Run every day
-    script = "${pkgs.bash}/bin/bash -c '${farm-control}/bin/farm-control start --farmVerb \"Pump BorePump\" --duration 1800 >> /var/log/farm_control_log.out || echo only run every third day'";
+    # Run for 60 minutes
+    script = "${pkgs.bash}/bin/bash -c '${farm-control}/bin/farm-control start --farmVerb \"Pump BorePump\" --duration 3600 >> /var/log/farm_control_log.out || echo only run every third day'";
   };
   systemd.timers.run_bore_pump = {
     wantedBy = [ "timers.target" ];
@@ -53,12 +67,12 @@ in
 
   systemd.services.irrigate_top_row = {
     serviceConfig.Type = "oneshot";
-    script = "${farm-control}/bin/farm-control start --farmVerb \"Irrigate TopRow\" --duration 600 >> /var/log/farm_control_log.out";
+    script = "${farm-control}/bin/farm-control start --farmVerb \"Irrigate TopRow\" --duration 1800 >> /var/log/farm_control_log.out";
   };
   systemd.timers.irrigate_top_row = {
     wantedBy = [ "timers.target" ];
     partOf = [ "irrigate_top_row.service" ];
-    timerConfig.OnCalendar = "*-*-* 7,21:00:00";
+    timerConfig.OnCalendar = "*-*-* 21:00:00";
   };
 
   systemd.services.irrigate_poly_tunnel = {
@@ -66,21 +80,21 @@ in
     # Run every third day
     #script = "${pkgs.bash}/bin/bash -c '(( $(date +\%s)/ 86400 \% 3 == 0 )) && ${farm-control}/bin/farm-control start --farmVerb \"Irrigate PolyTunnel\" --duration 1800 >> /var/log/farm_control_log.out || echo only run every third day'";
     # Run every day
-    script = "${pkgs.bash}/bin/bash -c '${farm-control}/bin/farm-control start --farmVerb \"Irrigate PolyTunnel\" --duration 600 >> /var/log/farm_control_log.out || echo only run every third day'";
+    script = "${pkgs.bash}/bin/bash -c '${farm-control}/bin/farm-control start --farmVerb \"Irrigate PolyTunnel\" --duration 1800 >> /var/log/farm_control_log.out || echo only run every third day'";
   };
   systemd.timers.irrigate_poly_tunnel = {
     wantedBy = [ "timers.target" ];
     partOf = [ "irrigate_poly_tunnel.service" ];
-    timerConfig.OnCalendar = "*-*-* 6,20:30:00";
+    timerConfig.OnCalendar = "*-*-* 20:30:00";
   };
 
   systemd.services.irrigate_pumpkins = {
     serviceConfig.Type = "oneshot";
-    script = "${farm-control}/bin/farm-control start --farmVerb \"Irrigate Pumpkins\" --duration 600 >> /var/log/farm_control_log.out";
+    script = "${farm-control}/bin/farm-control start --farmVerb \"Irrigate Pumpkins\" --duration 1800 >> /var/log/farm_control_log.out";
   };
   systemd.timers.irrigate_pumpkins = {
     wantedBy = [ "timers.target" ];
     partOf = [ "irrigate_pumpkins.service" ];
-    timerConfig.OnCalendar = "*-*-* 6,20:00:00";
+    timerConfig.OnCalendar = "*-*-* 20:00:00";
   };
 }

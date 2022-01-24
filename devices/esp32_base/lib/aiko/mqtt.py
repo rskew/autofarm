@@ -28,6 +28,10 @@ import aiko.oled as oled
 
 import configuration.mqtt
 
+import configuration.main
+parameter = configuration.main.parameter
+device_name = parameter("device_name")
+
 WAIT_MQTT_CONNECTED_PERIOD = 1000  # milliseconds
 WAIT_MQTT_INCOMING_MESSAGE = 10000  # milliseconds
 WAIT_WIFI_CONNECTED_PERIOD = 10000  # milliseconds
@@ -130,7 +134,7 @@ def connect(settings=configuration.mqtt.settings):
     settings["host"], settings["port"], keepalive=keepalive)
 
   client.set_callback(on_message)
-  client.set_last_will(topic_path + "/state", "nil")
+  client.set_last_will(topic_path + "/state", "disconnected")
   try:
     client.connect()
     aiko.event.add_timer_handler(mqtt_ping_handler, keepalive * 1000)
@@ -146,7 +150,7 @@ def connect(settings=configuration.mqtt.settings):
     common.log("MQTT connected")
     common.log("  " + settings["host"])
     common.log("  " + topic_path)
-    payload_out = "(boot %s %s)" % (common.AIKO_VERSION, "swagbadge")
+    payload_out = "(boot %s %s)" % (common.AIKO_VERSION, device_name)
     client.publish(topic_path + "/out", payload_out)
   except Exception as e:
     print(e)

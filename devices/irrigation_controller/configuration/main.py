@@ -1,7 +1,7 @@
 # configuration/main.py: version: 2021-01-22 18:00 v05
 
 settings = {
-  "decive_name":      "irrigation_controller",
+  "device_name":      "irrigation_controller",
   "application":      "applications/irrigation_controller",
   "denye_pins":       [12, 14],  # If touch_pins pressed, don't run "main.py"
   "logger_enabled":   False,     # Display everyone's log output
