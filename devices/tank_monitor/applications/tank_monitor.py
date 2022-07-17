@@ -112,7 +112,7 @@ def monitor_tank_level():
             retries = 50
         else:
             print("Tank level nominal")
-            # If the reading is nominal, set wakeup on change to critical.
+            # If the reading is nominal, configure to wakeup if the state changes to critical.
             tank_monitor.wake_on_critical()
             retries = 5
             # If tank level is not critical and battery is low,

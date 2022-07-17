@@ -54,13 +54,15 @@ farm_devices = {
 def on_farm_verb(topic, message_raw):
     '''
     Act on farm control messages defined in `../../farm-control/Main.hs`
+    e.g.
+    irrigation_controller/in/irrigate/PolyTunnel/start"
     '''
     print(topic, message_raw)
-    farmVerb = topic.split('/')[0]
-    farm_thing, start_stop = topic.split('/')[2:4]
+    farmVerb = topic.split('/')[2]
+    farm_thing, start_stop = topic.split('/')[3:5]
     aiko.mqtt.client.publish(
         "/".join(["irrigation_controller/out", farmVerb, farm_thing, start_stop, "ack"]),
-        start_stop + " " + farm_thing
+        start_stop + " " + farmVerb + " " + farm_thing
     )
     if start_stop == "stop":
         farm_devices[farm_thing].off()
@@ -81,7 +83,7 @@ def on_farm_verb(topic, message_raw):
         )
     else:
         aiko.mqtt.client.publish(
-            configuration.mqtt.setting["topic_path"] + "/out/" + topic + "/ack",
+            "irrigation_controller/out/" + topic + "/ack",
             "ERROR: unknown action: " + start_stop
         )
 

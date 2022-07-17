@@ -51,8 +51,8 @@ instance ParseField FarmVerb
 
 farmVerbTopic :: FarmVerb -> String
 farmVerbTopic = \case
-  Irrigate zone -> "irrigate/in/" ++ show zone
-  Pump pump -> "pump/in/" ++ show pump
+  Irrigate zone -> "irrigate/" ++ show zone
+  Pump pump -> "pump/" ++ show pump
 
 data FarmNode
   = IrrigationController
