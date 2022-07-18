@@ -1,0 +1,9 @@
+-sname autofarm
+
+-setcookie autofarm_cookie
+
++C multi_time_warp
++c true
+
++K true
++A30
