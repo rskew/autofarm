@@ -1,0 +1,39 @@
+<html>
+    <script>
+        function openWebSocket(token) {
+            const socket = new WebSocket('ws://localhost:8081/ws');
+
+            socket.addEventListener('open', function (event) {
+                socket.send('Authorization: Bearer ' + token);
+                socket.send('Hello!');
+                socket.send('Hi!');
+                socket.send('Howdy!');
+                socket.send('Hey!');
+            });
+
+            socket.addEventListener('message', function (event) {
+                console.log('Message from server ', event.data);
+                var node = document.createElement('li');
+                node.appendChild(document.createTextNode(event.data));
+                document.querySelector('ul').appendChild(node);
+            });
+        };
+
+        function sendAuthorizationRequest(then) {
+            function authRequestListener () {
+              then(this.responseText);
+            }
+            const oReq = new XMLHttpRequest();
+            oReq.addEventListener("load", authRequestListener);
+            oReq.open("GET", "http://localhost:8081/authorize");
+            oReq.send();
+        };
+
+        sendAuthorizationRequest(openWebSocket);
+    </script>
+    <body>
+        <p>Messages Received:</p>
+        <ul>
+        </ul>
+    </body>
+</html>

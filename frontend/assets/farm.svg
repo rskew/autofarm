@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   sodipodi:docname="farm.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="2.1997092"
+     inkscape:cx="100.92243"
+     inkscape:cy="673.72542"
+     inkscape:window-width="3840"
+     inkscape:window-height="2160"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g1570" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 23.350304,145.93101 126.01171,285.51423 182.43914,257.7801 185.70739,206.43572 156.87077,64.589797 107.95346,5.88114 1.4745313,69.361528 Z"
+       id="path42" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 23.350304,145.93101 156.87077,64.589797"
+       id="path110" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 97.78,100.77537 48.04914,77.29329"
+       id="path112" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="M 73.515973,214.9841 145.82914,178.06866"
+       id="path114" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 145.82914,178.06866 29.36243,-18.85433"
+       id="path116" />
+    <g
+       id="top_tank">
+      <ellipse
+         style="fill:#008080;stroke-width:0.264583"
+         id="path208"
+         cx="51.380287"
+         cy="155.17543"
+         rx="2.6830368"
+         ry="2.695462" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+         x="55.589664"
+         y="156.73621"
+         id="text3350"><tspan
+           sodipodi:role="line"
+           id="tspan3348"
+           style="font-size:4.23333px;stroke-width:0.264583"
+           x="55.589664"
+           y="156.73621">Top Tank</tspan></text>
+      <rect
+         style="fill:#008080;fill-opacity:0;stroke:#000000;stroke-width:0.17654;stroke-opacity:1"
+         id="rect10796"
+         width="27.661695"
+         height="7.4068999"
+         x="47.664742"
+         y="151.4314" />
+    </g>
+    <g
+       id="bore_pump">
+      <rect
+         style="fill:#0000ff;fill-opacity:0;stroke:#000000;stroke-width:0.14616;stroke-opacity:1"
+         id="rect10796-3"
+         width="24.604616"
+         height="5.70785"
+         x="124.2739"
+         y="237.05898" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+         x="124.98879"
+         y="241.32086"
+         id="text3350-6"><tspan
+           sodipodi:role="line"
+           id="tspan3348-7"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="124.98879"
+           y="241.32086">Bore Pump</tspan></text>
+    </g>
+    <g
+       id="poly_tunnel_drippers">
+      <rect
+         style="fill:#0000ff;fill-opacity:0;stroke:#000000;stroke-width:0.209014;stroke-opacity:1"
+         id="rect10796-3-7"
+         width="25.386549"
+         height="11.312991"
+         x="109.54644"
+         y="181.22975" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+         x="110.2299"
+         y="185.46021"
+         id="text3350-6-0"><tspan
+           sodipodi:role="line"
+           id="tspan3348-7-9"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="110.2299"
+           y="185.46021">Poly Tunnel</tspan><tspan
+           sodipodi:role="line"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="110.2299"
+           y="190.75186"
+           id="tspan28986">Drippers</tspan></text>
+    </g>
+    <g
+       id="middle_rows_drippers">
+      <rect
+         style="fill:#0000ff;fill-opacity:0;stroke:#000000;stroke-width:0.212865;stroke-opacity:1"
+         id="rect10796-3-7-3"
+         width="28.280514"
+         height="10.532952"
+         x="89.258812"
+         y="193.33875" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+         x="89.940346"
+         y="197.56728"
+         id="text3350-6-0-6"><tspan
+           sodipodi:role="line"
+           id="tspan3348-7-9-0"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="89.940346"
+           y="197.56728">Middle Rows</tspan><tspan
+           sodipodi:role="line"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="89.940346"
+           y="202.85893"
+           id="tspan28986-6">Drippers</tspan></text>
+    </g>
+    <ellipse
+       style="fill:#0000ff;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-opacity:1"
+       id="path27017"
+       cx="151.17503"
+       cy="225.31314"
+       rx="9.6281519"
+       ry="8.5617218" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583;stroke-opacity:1"
+       id="rect27346"
+       width="12.602317"
+       height="6.3277783"
+       x="-15.773077"
+       y="282.96136"
+       transform="rotate(-31.546372)" />
+    <g
+       id="g1562">
+      <g
+         id="g1570">
+        <g
+           id="g1578"
+           transform="rotate(-33.438751,52.189334,-32.74482)">
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614"
+             width="32.123001"
+             height="3.6271079"
+             x="199.93784"
+             y="46.637154"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614-7"
+             width="32.123001"
+             height="3.6271079"
+             x="199.94411"
+             y="41.637157"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614-7-5"
+             width="32.123001"
+             height="3.6271079"
+             x="199.95068"
+             y="36.637161"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614-7-5-3"
+             width="32.123001"
+             height="3.6271079"
+             x="199.95726"
+             y="31.637167"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614-7-5-3-5"
+             width="32.123001"
+             height="3.6271079"
+             x="199.96384"
+             y="26.637171"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+          <rect
+             style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+             id="rect27614-7-5-3-5-6"
+             width="32.123001"
+             height="3.6271079"
+             x="199.9704"
+             y="21.637175"
+             rx="1"
+             ry="1"
+             transform="rotate(89.92466)" />
+        </g>
+      </g>
+    </g>
+    <g
+       id="top_row_drippers">
+      <rect
+         style="fill:#0000ff;fill-opacity:0;stroke:#000000;stroke-width:0.178863;stroke-opacity:1"
+         id="rect10796-3-7-3-7"
+         width="19.703674"
+         height="10.673888"
+         x="73.515976"
+         y="204.31021" />
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-weight:normal;font-size:4.23333px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+         x="74.214508"
+         y="208.55574"
+         id="text3350-6-0-6-9"><tspan
+           sodipodi:role="line"
+           id="tspan3348-7-9-0-2"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="74.214508"
+           y="208.55574">Top Row</tspan><tspan
+           sodipodi:role="line"
+           style="font-size:4.23333px;fill:#000000;stroke-width:0.264583"
+           x="74.214508"
+           y="213.8474"
+           id="tspan28986-6-0">Drippers</tspan></text>
+    </g>
+  </g>
+</svg>
