@@ -13,16 +13,17 @@ to generate this file without the comments in this block.
 { name = "my-project"
 , dependencies =
   [ "console"
+  , "control"
   , "datetime"
   , "effect"
   , "free"
   , "maybe"
   , "now"
-  , "numbers"
   , "prelude"
   , "random"
   , "simple-json"
   , "tailrec"
+  , "transformers"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

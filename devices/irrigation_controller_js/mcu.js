@@ -35,13 +35,18 @@ function connect_autofarm() {
         clearTimeout(timeout);
         global_client = socket_client;
         console.log('client connected');
-        global_client.write("Hello");
+        writeMessage("Hello");
         global_client.on('data', streamParser());
         global_client.on('end', function() {
             console.log('client disconnected');
             setTimeout(() => connect_autofarm(), 5000);
         });
     });
+}
+
+function writeMessage(messageStr) {
+    global_client.write(messageStr);
+    global_client.write(String.fromCharCode(0));
 }
 
 function streamParser() {
@@ -79,7 +84,11 @@ function streamParser() {
                 console.log("Activating solenoid", solenoid, "for", duration, "seconds");
                 // TODO don't just flash
                 digitalWrite(D2,1);
-                setTimeout(() => digitalWrite(D2,0), duration * 1000);
+                setTimeout(function() {
+                    digitalWrite(D2,0);
+                    writeMessage("[\"update_state\", {\"solenoid_id\":"+solenoid+",\"active\":false,\"timestamp_millis\":" + Date.now() + "}]");
+                }, duration * 1000);
+                writeMessage("[\"update_state\", {\"solenoid_id\":"+solenoid+",\"active\":true,\"timestamp_millis\":" + Date.now() + "}]");
             }
         } else {
             console.log("ERROR: unknown state:", state);

@@ -39,9 +39,15 @@ callback_mode() ->
 
 
 init(Port) ->
-    io:format("Listening on port ~p~n", [Port]),
-    {ok, Listen} = gen_tcp:listen(Port, [{active, false}]),
-    {ok, waiting, #{listen => Listen}}.
+    case gen_tcp:listen(Port, [{active, false}, binary]) of
+        {ok, Listen} ->
+            io:format("Listening on port ~p~n", [Port]),
+            {ok, waiting, #{listen => Listen, partial_message => <<>>}};
+        {error, Reason} ->
+            io:format("Couldn't listen on port ~p ~p~n", [Port, Reason]),
+            timer:sleep(5000),
+            init(Port)
+    end.
 
 
 terminate(Reason, _State, #{connection := Socket, listen := Listen}) ->
@@ -59,7 +65,25 @@ terminate(Reason, _State, #{listen := Listen}) ->
 
 connected(enter, _OldState, _Data) -> keep_state_and_data;
 
-connected(info, {tcp, _Socket, Message}, _Data) ->
+connected(info, {tcp, _Socket, Packet}, Data=#{partial_message := PartialMessage}) ->
+    %io:format("Received tcp packet ~p~n", [Packet]),
+    Packet1 = <<PartialMessage/binary, Packet/binary>>,
+    Messages1 = binary:split(Packet1, <<0>>, [global]),
+    NewPartialMessage = lists:last(Messages1), % This is <<>> if there is no partial message
+    Messages2 = lists:droplast(Messages1),
+    %io:format("Received messages ~p~n", [Messages2]),
+    lists:map(fun(Message) ->
+                  case jsone:try_decode(Message) of
+                      {ok, MessageMap, <<>>} ->
+                          gen_statem:cast(?MODULE, {message, MessageMap});
+                      {error, Reason} ->
+                          io:format("Couldn't decode message ~p~n", [Message])
+                  end
+              end,
+              Messages2),
+    {keep_state, Data#{partial_message := NewPartialMessage}};
+
+connected(cast, {message, Message}, _State) ->
     io:format("Received message ~p~n", [Message]),
     keep_state_and_data;
 
@@ -103,7 +127,7 @@ waiting(enter, _OldState, _Data=#{listen := Listen}) ->
 
 waiting(cast, {connection, Socket}, Data) ->
     io:format("New connection~n"),
-    ok = inet:setopts(Socket, [{active, true}]),
+    inet:setopts(Socket, [{active, true}]),
     {next_state, connected, Data#{connection => Socket}};
 
 waiting(Event, EventContent, Data) -> handle_common(Event, EventContent, Data).
@@ -113,7 +137,7 @@ waiting(Event, EventContent, Data) -> handle_common(Event, EventContent, Data).
 %%%===================================================================
 
 handle_common(Event, EventContent, _Data) ->
-    io:format("Unhandled event: ~p ~p~n", [Event, EventContent]),
+    io:format("Unhandled ~p: ~p~n", [Event, EventContent]),
     keep_state_and_data.
 
 

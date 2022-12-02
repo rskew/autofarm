@@ -2,7 +2,8 @@ import net from 'net';
 
 export var dummySocket = {};
 
-var messages = [];
+var socketMessages = [];
+var systemMessages = [];
 
 function streamParser() {
     let messageChunks = [];
@@ -33,7 +34,7 @@ function streamParser() {
                 }
                 E.reboot();
             } else {
-                messages.push(message);
+                socketMessages.push(message);
             }
         } else {
             console.log("ERROR: unknown state:", state);
@@ -74,36 +75,49 @@ function streamParser() {
     };
 }
 
-export function socketConnectImpl(just) {
-    return function(nothing){
-        return function({host, port}) {
-            return function(continuation) {
-                const client = net.connect({host: host, port: port});
-                client.on('connect', () => client.write("Hello"));
-                //client.on('data', streamParser());
-                setTimeout(function(){client.on('data', streamParser())}, 10000);
-                client.on('end', () => console.log('client disconnected'));
-                continuation(just(client));
-            }
+export function socketConnectImplJs(just) {
+    return function(nothing) {
+    return function(systemMessageSocketClosed) {
+    return function({host, port}) {
+        return function(continuation) {
+            const socket = net.connect({host: host, port: port});
+            socket.on('error', (err) => {console.log('Error connecting to socket:', err); continuation(nothing)});
+            socket.on('connect', function() {
+                console.log("Connected");
+                socket.on('data', streamParser());
+                //setTimeout(function(){socket.on('data', streamParser())}, 1000);
+                socket.on('end', function() {
+                    console.log('client disconnected');
+                    systemMessages.push(systemMessageSocketClosed);
+                });
+                socket.write("Hello");
+                socket.write(new Uint8Array(1));
+                continuation(just(socket));
+            });
         }
-    }
+    }}}
 }
 
-export function socketClose(socket) {
+export function socketCloseImpl(socket) {
   return function() {
     socket.end();
   }
 }
 
-export function socketWrite(socket) {
+export function socketWriteMessageImpl(socket) {
   return function(message) {
     return function(continuation) {
-      socket.write(message, 'utf8', continuation);
-    }
+        let buffer = new Uint8Array(message.length + 1);
+        for (var i=0; i < message.length; i++) {
+            buffer[i] = message.charCodeAt(i);
+        };
+        buffer[-1] = 0;
+        console.log("Data written to socket:", socket.write(buffer, continuation));
+    };
   }
 }
 
-export function socketReceiveImpl(just) {
+export function socketReceiveImplJs(just) {
     return function(nothing) {
     return function(storeFileMessage) {
     return function(rebootMessage) {
@@ -114,9 +128,9 @@ export function socketReceiveImpl(just) {
     return function(doThingBMessage) {
         return function(socket) {
             return function(continuation) {
-                if (messages.length > 0) {
-                    let message = messages[0];
-                    messages = messages.slice(1, messages.length);
+                if (socketMessages.length > 0) {
+                    let message = socketMessages[0];
+                    socketMessages = socketMessages.slice(1, socketMessages.length);
                     continuation(just(flashLightsMessage));
                 } else {
                     continuation(nothing);
@@ -124,4 +138,28 @@ export function socketReceiveImpl(just) {
             }
     }
     }}}}}}}}
+}
+
+export function systemReceiveImplJs(just) {
+    return function(nothing) {
+        return function(continuation) {
+            if (systemMessages.length > 0) {
+                let message = systemMessages[0];
+                systemMessages = systemMessages.slice(1, systemMessages.length);
+                continuation(just(message));
+            } else {
+                continuation(nothing);
+            }
+        }
+    }
+}
+
+export function deepSleepImplJs(millis) {
+    return function(continuation) {
+        setTimeout(function(){
+            socketMessages = [];
+            systemMessages = [];
+            continuation();
+        }, millis);
+    }
 }
