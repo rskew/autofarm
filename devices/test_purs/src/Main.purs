@@ -16,6 +16,7 @@ import Effect.Laff (Laff, delay, runLaff)
 import Effect.Class (liftEffect)
 import Effect.Console as Console
 import Effect.Random (random, randomInt)
+import Record as R
 import Simple.JSON (writeJSON)
 
 data State
@@ -402,4 +403,239 @@ runSimNode :: Effect Unit
 runSimNode = do
   Console.log "Starting simulation"
   _ <- runLaff $ runProgram interpretSimNode InitialState
+  pure unit
+
+type DeviceActions =
+  { now :: Laff Milliseconds
+  , sleep :: Milliseconds -> Laff Unit
+  , deepSleep :: Milliseconds -> Laff Unit
+  , doAfter :: Milliseconds -> (Laff Unit) -> Laff Unit
+  , readBatteryVoltage :: Laff (Maybe Number)
+  , connect :: ConnectionConfig -> Laff (Maybe Socket)
+  , closeConnection :: Socket -> Laff Unit
+  , sendSocketMessage :: Socket -> String -> Laff Unit
+  , receiveSocketMessage :: Socket -> Laff (Maybe SocketMessage)
+  , receiveSystemMessage :: Laff (Maybe SystemMessage')
+  , readSensor :: Laff (Maybe Number)
+  , flashLights :: Laff Unit
+  }
+
+data SystemMessage'
+  = SystemMessageSocketClosed'
+  | SystemMessageAction' (Laff Unit)
+
+instance Show SystemMessage' where
+  show SystemMessageSocketClosed' = "SystemMessageSocketClosed"
+  show (SystemMessageAction' _) = "SystemMessageAction"
+
+foreign import systemReceiveImplJs2 :: (forall x. x -> Maybe x) -> (forall x. Maybe x) -> Laff (Maybe SystemMessage')
+
+systemReceiveImpl' :: Laff (Maybe SystemMessage')
+systemReceiveImpl' = systemReceiveImplJs2 Just Nothing
+
+program' :: Config -> DeviceActions -> (State -> Laff State)
+program' config actions =
+  let
+    handleSystemMessage :: ReceivingState -> SystemMessage' -> Laff State
+    handleSystemMessage _ SystemMessageSocketClosed' = pure $ DeepSleepingState {socket: Nothing}
+    handleSystemMessage state (SystemMessageAction' action) = do
+      action
+      pure $ ReceivingState state
+
+    handleSocketMessage :: ReceivingState -> SocketMessage -> Laff State
+    handleSocketMessage state (SocketMessageStoreFile name size) = do
+      --actions.storeFile name size
+      pure $ ReceivingState state
+    handleSocketMessage _ SocketMessageReboot = do
+      actions.deepSleep $ Milliseconds 0.0
+      pure InitialState
+    handleSocketMessage state SocketMessageReadSensor = do
+      actions.readSensor >>= case _ of
+        Nothing -> pure unit
+        Just sensorReading -> actions.sendSocketMessage state.socket $ writeJSON {sensor_reading: sensorReading}
+      pure $ ReceivingState state
+    handleSocketMessage state SocketMessageReadBatteryVoltage = do
+      actions.readBatteryVoltage >>= case _ of
+        Nothing -> pure unit
+        Just voltage -> actions.sendSocketMessage state.socket $ writeJSON {battery_voltage: voltage}
+      pure $ ReceivingState state
+    handleSocketMessage state SocketMessageFlashLights = do
+      actions.flashLights
+      pure $ ReceivingState state
+    handleSocketMessage state SocketMessageDoThingA = pure $ ReceivingState state
+    handleSocketMessage state SocketMessageDoThingB = pure $ ReceivingState state
+  in
+    case _ of
+      InitialState ->
+        actions.readBatteryVoltage >>= case _ of
+          Just batteryVoltage | batteryVoltage < 3.3 ->
+            pure $ DeepSleepingState {socket: Nothing}
+          _ -> do
+              actions.connect config.connectionConfig >>= case _ of
+                Nothing -> pure $ DeepSleepingState {socket: Nothing}
+                Just socket -> pure $ ReceivingState { timeLastSendBatteryVoltage: Milliseconds 0.0, socket: socket }
+      ReceivingState state -> do
+        fromMaybe (pure $ ReceivingPauseState state) =<< (runMaybeT $
+          (MaybeT $ actions.receiveSystemMessage <#> map (handleSystemMessage state))
+          <|>
+          (MaybeT $ actions.receiveSocketMessage state.socket <#> map (handleSocketMessage state))
+          <|>
+          (MaybeT $ actions.readBatteryVoltage <#> map \batteryVoltage -> do
+             nowMillis <- actions.now
+             if nowMillis > state.timeLastSendBatteryVoltage <> config.batteryVoltageSendPeriod
+               then do
+                 liftEffect $ Console.log "Write battery voltage to socket"
+                 actions.sendSocketMessage state.socket $ writeJSON {battery_voltage: batteryVoltage}
+               else pure unit
+             if batteryVoltage < 3.3
+               then pure $ DeepSleepingState {socket: Just state.socket}
+               else pure $ ReceivingPauseState $ state {timeLastSendBatteryVoltage = nowMillis}))
+      ReceivingPauseState state -> do
+        actions.sleep config.loopSleepPeriod
+        pure $ ReceivingState state
+      DeepSleepingState state -> do
+        case state.socket of
+          Nothing -> pure unit
+          Just socket -> actions.closeConnection socket
+        actions.deepSleep config.deepSleepPeriod
+        pure InitialState
+
+runProgram' :: DeviceActions -> State -> Laff Unit
+runProgram' interpretedActions state = do
+  state' <- program' { loopSleepPeriod: Milliseconds 3000.0
+                     , batteryVoltageSendPeriod: Milliseconds 500.0
+                     , deepSleepPeriod: Milliseconds 4000.0
+                     , connectionConfig:
+                       { timeout: Milliseconds 5000.0
+                       --, host: "localhost"
+                       , host: "192.168.182.1"
+                       , port: 9222
+                       , wifi_ssid: "hello"
+                       , wifi_password: "hi"
+                       }
+                     }
+                     interpretedActions
+                     state
+  runProgram' interpretedActions state'
+
+interpretPrinty' :: DeviceActions
+interpretPrinty' =
+  { now: do
+      nowMillis <- liftEffect $ EffectNow.now
+      pure $ unInstant nowMillis
+  , sleep: \millis -> do
+      liftEffect $ Console.log ("sleeping for " <> show millis)
+      liftEffect $ Console.log ""
+      delay millis
+  , deepSleep: \millis -> do
+      liftEffect $ Console.log ("deep-sleeping for " <> show millis)
+      liftEffect $ Console.log ""
+      delay millis
+  , doAfter: \millis action -> do
+      liftEffect $ runLaff do
+        delay millis
+        action
+  , readBatteryVoltage: do
+      reading <- liftEffect do
+        voltage <- random <#> \r -> r * 3.3 + 3.0
+        choice <- randomInt 0 4
+        pure if choice == 0 then Nothing else Just voltage
+      liftEffect $ Console.log $ "read battery voltage: " <> show reading
+      pure reading
+  , connect: \opts -> do
+      socket <- liftEffect $ randomInt 0 4 <#> \r -> if r == 0 then Nothing else Just dummySocket
+      liftEffect $ Console.log $ "connecting created: " <> show (isJust socket)
+      pure socket
+  , closeConnection: \socket -> do
+      liftEffect $ Console.log "close connection"
+  , sendSocketMessage: \socket message -> do
+      liftEffect $ Console.log $ "send message " <> message
+  , receiveSocketMessage: \socket -> do
+      message <- liftEffect $ randomInt 0 (7 - 1 + 10) <#> case _ of
+        0 -> Just $ SocketMessageStoreFile ".boot0" 55
+        1 -> Just SocketMessageReboot
+        2 -> Just SocketMessageReadSensor
+        3 -> Just SocketMessageReadBatteryVoltage
+        4 -> Just SocketMessageFlashLights
+        5 -> Just SocketMessageDoThingA
+        6 -> Just SocketMessageDoThingB
+        _ -> Nothing
+      liftEffect $ Console.log $ "received socket message: " <> show message
+      pure message
+  , receiveSystemMessage: do
+      message <- liftEffect $ randomInt 0 5 <#> case _ of
+        0 -> Just SystemMessageSocketClosed'
+        1 -> Just $ SystemMessageAction' (liftEffect $ Console.log "doAfter action hello")
+        _ -> Nothing
+      liftEffect $ Console.log $ "received system message: " <> show message
+      pure message
+  , readSensor: do
+      reading <- liftEffect do
+        value <- random <#> \r -> r * 5.0
+        choice <- randomInt 0 (7 - 1 + 10)
+        pure if choice == 0 then Nothing else Just value
+      liftEffect $ Console.log $ "sensor reading " <> show reading
+      pure reading
+  , flashLights: do
+      liftEffect $ Console.log "Flashing lights"
+  }
+
+runPrinty2 :: Effect Unit
+runPrinty2 = do
+  Console.log "Hello printy printo!"
+  _ <- runLaff $ runProgram' interpretPrinty' InitialState
+  pure unit
+
+foreign import socketConnectImplJs2 ::
+  (forall x. x -> Maybe x) -> (forall x. Maybe x) -> SystemMessage' -> ConnectionConfig -> Laff (Maybe Socket)
+
+socketConnectImpl' :: ConnectionConfig -> Laff (Maybe Socket)
+socketConnectImpl' = socketConnectImplJs2 Just Nothing SystemMessageSocketClosed'
+
+interpretSim :: DeviceActions
+interpretSim =
+  R.merge
+  { deepSleep: \millis -> do
+      liftEffect $ Console.log ("deep-sleeping for " <> show millis)
+      liftEffect $ Console.log ""
+      deepSleepImpl millis
+  , connect: \connectionConfig -> do
+      maybeSocket <- socketConnectImpl' connectionConfig
+      pure maybeSocket
+  , closeConnection: \socket -> do
+      liftEffect $ socketCloseImpl socket
+  , sendSocketMessage: \socket message -> do
+      socketWriteMessageImpl socket message
+  , receiveSocketMessage: \socket -> do
+      maybeMessage <- socketReceiveImpl socket
+      liftEffect $ Console.log $ "received socket message: " <> show maybeMessage
+      pure maybeMessage
+  , receiveSystemMessage: do
+      maybeMessage <- systemReceiveImpl'
+      liftEffect $ Console.log $ "received system message: " <> show maybeMessage
+      pure maybeMessage
+  }
+  interpretPrinty'
+
+runSim :: Effect Unit
+runSim = do
+  Console.log "Hello Simmo!"
+  _ <- runLaff $ runProgram' interpretSim InitialState
+  pure unit
+
+foreign import flashLightsImpl :: Laff Unit
+
+interpretMCU :: DeviceActions
+interpretMCU =
+  R.merge
+  { flashLights: do
+      liftEffect $ Console.log "FLASH FOR REAL"
+      flashLightsImpl
+  }
+  interpretSim
+
+runMCU :: Effect Unit
+runMCU = do
+  Console.log "Hello MCU!"
+  _ <- runLaff $ runProgram' interpretMCU InitialState
   pure unit

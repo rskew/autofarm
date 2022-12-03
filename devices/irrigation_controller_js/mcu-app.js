@@ -1,3 +1,5 @@
+ESP32.enableBLE(false);
+
 console.log("Hello");
 
 function flash() {

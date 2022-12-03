@@ -1,6 +1,6 @@
 if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {
-        console.log('Connected to Wifi.  IP address is:', netConfig.serverIP);
+        console.log('Connected to Wifi.  IP address is:', details.ip);
         console.log('Connecting to erlang at ', netConfig.serverIP, netConfig.serverPort);
         connect_autofarm();
     });

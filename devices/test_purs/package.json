@@ -4,13 +4,19 @@
   "description": "",
   "main": "index.html",
   "scripts": {
-    "build": "spago build && ./node_modules/rollup/dist/bin/rollup --format=cjs --file=dist/runPrintyBundle.cjs -- runPrinty.js && ls -lh dist",
+    "build": "spago build && ./node_modules/rollup/dist/bin/rollup --format=cjs --file=dist/runPrintyBundle.cjs -- runPrinty2.js && ls -lh dist",
     "patch": "sed -i 's/for (var \\([a-z]\\) in \\([a-z]*\\)) {/for (var \\1 in (\\2 || [])) {/g' dist/runPrintyBundle.cjs",
     "minify": "./node_modules/uglify-js/bin/uglifyjs dist/runPrintyBundle.cjs --output dist/runPrintyBundle.min.cjs --mangle --rename --no-annotations --toplevel --validate",
-    "minifySim": "./node_modules/uglify-js/bin/uglifyjs dist/runSimNodeBundle.cjs --output dist/runSimNodeBundle.min.cjs --mangle --rename --no-annotations --toplevel --validate",
     "run-printy": "node ./dist/runPrintyBundle.min.cjs",
     "flash-printy-app": "./node_modules/espruino/bin/espruino-cli.js --no-ble -p /dev/ttyUSB0 -b 115200 -m --storage .boot0:dist/runPrintyBundle.js",
-    "flash-asdf": "./node_modules/espruino/bin/espruino-cli.js --no-ble -p /dev/ttyUSB1 -b 115200 -m --storage .boot0:asdf.js"
+    "flash-asdf": "./node_modules/espruino/bin/espruino-cli.js --no-ble -p /dev/ttyUSB1 -b 115200 -m --storage .boot0:asdf.js",
+    "build-sim": "spago build && ./node_modules/rollup/dist/bin/rollup --format=cjs --file=dist/runSimBundle.cjs -- runSim.js && ls -lh dist",
+    "patch-sim": "sed -i 's/for (var \\([a-z]\\) in \\([a-z]*\\)) {/for (var \\1 in (\\2 || [])) {/g' dist/runSimBundle.cjs",
+    "minify-sim": "./node_modules/uglify-js/bin/uglifyjs dist/runSimBundle.cjs --output dist/runSimBundle.min.cjs --mangle --rename --no-annotations --toplevel --validate",
+    "run-sim": "node ./dist/runSimBundle.min.cjs",
+    "build-mcu": "spago build && ./node_modules/rollup/dist/bin/rollup --format=cjs --file=dist/runMCUBundle.cjs -- runMCU.js && ls -lh dist",
+    "patch-mcu": "sed -i 's/for (var \\([a-z]\\) in \\([a-z]*\\)) {/for (var \\1 in (\\2 || [])) {/g' dist/runMCUBundle.cjs",
+    "minify-mcu": "./node_modules/uglify-js/bin/uglifyjs dist/runMCUBundle.cjs --output dist/runMCUBundle.min.cjs --mangle --rename --no-annotations --toplevel --validate"
   },
   "author": "",
   "license": "ISC",

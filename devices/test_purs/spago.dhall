@@ -21,6 +21,7 @@ to generate this file without the comments in this block.
   , "now"
   , "prelude"
   , "random"
+  , "record"
   , "simple-json"
   , "tailrec"
   , "transformers"

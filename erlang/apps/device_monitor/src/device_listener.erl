@@ -51,7 +51,8 @@ acceptor(Listen) ->
 dispatcher(Socket) ->
     case gen_tcp:recv(Socket, 0, ?DISPATCH_TIMEOUT) of
         {ok, Packet} ->
-            [FirstMessage,RestOfPacket|[]] = binary:split(Packet, <<0>>),
+            [FirstMessage|Rest] = binary:split(Packet, <<0>>),
+            RestOfPacket = list_to_binary(lists:join(<<0>>, Rest)),
             case jsone:try_decode(FirstMessage) of
                 {ok, [<<"connect">>, #{<<"type">> := DeviceType, <<"id">> := DeviceID}], <<>>} ->
                     case gproc:lookup_pids({n, l, {DeviceType, DeviceID}}) of

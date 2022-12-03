@@ -78,9 +78,9 @@ function streamParser() {
 export function socketConnectImplJs(just) {
     return function(nothing) {
     return function(systemMessageSocketClosed) {
-    return function({host, port}) {
+    return function(netConfig) {
         return function(continuation) {
-            const socket = net.connect({host: host, port: port});
+            const socket = net.connect({host: netConfig.host, port: netConfig.port});
             socket.on('error', (err) => {console.log('Error connecting to socket:', err); continuation(nothing)});
             socket.on('connect', function() {
                 console.log("Connected");
@@ -90,13 +90,13 @@ export function socketConnectImplJs(just) {
                     console.log('client disconnected');
                     systemMessages.push(systemMessageSocketClosed);
                 });
-                socket.write("Hello");
-                socket.write(new Uint8Array(1));
+                socket.write(JSON.stringify(["connect", {"type": "device_monitor", "id": 0}]) + "\0");
                 continuation(just(socket));
             });
         }
     }}}
 }
+export var socketConnectImplJs2 = socketConnectImplJs;
 
 export function socketCloseImpl(socket) {
   return function() {
@@ -107,12 +107,9 @@ export function socketCloseImpl(socket) {
 export function socketWriteMessageImpl(socket) {
   return function(message) {
     return function(continuation) {
-        let buffer = new Uint8Array(message.length + 1);
-        for (var i=0; i < message.length; i++) {
-            buffer[i] = message.charCodeAt(i);
-        };
-        buffer[-1] = 0;
-        console.log("Data written to socket:", socket.write(buffer, continuation));
+        console.log("hi socketWriteMessageImpl");
+        socket.write(message + "\0");
+        continuation();
     };
   }
 }
@@ -129,9 +126,19 @@ export function socketReceiveImplJs(just) {
         return function(socket) {
             return function(continuation) {
                 if (socketMessages.length > 0) {
-                    let message = socketMessages[0];
+                    let message = JSON.parse(socketMessages[0]);
                     socketMessages = socketMessages.slice(1, socketMessages.length);
-                    continuation(just(flashLightsMessage));
+                    let command = message[0];
+                    let params = message[1];
+                    console.log("Received command", command, "with params", params);
+                    if (command == "flash") {
+                        continuation(just(flashLightsMessage));
+                    } else if (command == "reboot") {
+                        continuation(just(rebootMessage));
+                    } else {
+                        console.log("Unhandled command", command, " with params", params);
+                        continuation(nothing);
+                    }
                 } else {
                     continuation(nothing);
                 }
@@ -153,6 +160,7 @@ export function systemReceiveImplJs(just) {
         }
     }
 }
+export var systemReceiveImplJs2 = systemReceiveImplJs;
 
 export function deepSleepImplJs(millis) {
     return function(continuation) {
@@ -162,4 +170,12 @@ export function deepSleepImplJs(millis) {
             continuation();
         }, millis);
     }
+}
+
+export function flashLightsImpl(continuation) {
+    digitalWrite(D2,1);
+    setTimeout(() => digitalWrite(D2,0), 500);
+    setTimeout(() => digitalWrite(D2,1), 700);
+    setTimeout(() => digitalWrite(D2,0), 1000);
+    continuation();
 }
