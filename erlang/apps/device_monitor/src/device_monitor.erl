@@ -2,61 +2,54 @@
 
 -behaviour(gen_statem).
 
--export([flash_lights/0, reboot_device/0, activate_solenoid/2, update_device_app/0]).
+-export([reboot_device/0, write_file_to_device/2, copy_file_on_device/2, delete_file_on_device/1]).
+-export([flash_lights/0, activate_solenoid/2]).
 
--export([start_link/0, init/1, callback_mode/0, handle_common/3, terminate/3]).
+-export([start_link/0, init/1, callback_mode/0, terminate/3]).
 -export([waiting/3, connected/3]).
--export([listen/2]).
 
--define(PORT, 9222).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 flash_lights() ->
-    gen_server:cast(?MODULE, flash_lights).
+    gen_statem:cast(?MODULE, flash_lights).
 
 reboot_device() ->
-    gen_server:cast(?MODULE, reboot_device).
+    gen_statem:cast(?MODULE, reboot_device).
 
 activate_solenoid(SolenoidId, DurationSeconds) ->
-    gen_server:cast(?MODULE, {activate_solenoid, SolenoidId, DurationSeconds}).
+    gen_statem:cast(?MODULE, {activate_solenoid, SolenoidId, DurationSeconds}).
 
-update_device_app() ->
-    gen_server:cast(?MODULE, update_device_app).
+write_file_to_device(LocalFileName, DeviceFileName) ->
+    gen_statem:cast(?MODULE, {write_file, LocalFileName, DeviceFileName}).
+
+copy_file_on_device(CopyFromFileName, CopyToFileName) ->
+    gen_statem:cast(?MODULE, {copy_file, CopyFromFileName, CopyToFileName}).
+
+delete_file_on_device(FileName) ->
+    gen_statem:cast(?MODULE, {delete_file, FileName}).
 
 %%%===================================================================
 %%% CallBack
 %%%===================================================================
 
 start_link() ->
-    gen_statem:start_link({local, ?MODULE}, ?MODULE, ?PORT, []).
+    gen_statem:start_link({local, ?MODULE}, ?MODULE, 0, []).
 
 
 callback_mode() ->
     [state_functions, state_enter].
 
 
-init(Port) ->
-    case gen_tcp:listen(Port, [{active, false}, binary]) of
-        {ok, Listen} ->
-            io:format("Listening on port ~p~n", [Port]),
-            {ok, waiting, #{listen => Listen, partial_message => <<>>}};
-        {error, Reason} ->
-            io:format("Couldn't listen on port ~p ~p~n", [Port, Reason]),
-            timer:sleep(5000),
-            init(Port)
-    end.
+init(ID) ->
+    gproc:register_name({n, l, {<<"device_monitor">>, ID}}, self()),
+    {ok, waiting, #{}}.
 
 
-terminate(Reason, _State, #{connection := Socket, listen := Listen}) ->
-    gen_tcp:close(Listen),
+terminate(Reason, _State, #{connection := Socket}) ->
     gen_tcp:close(Socket),
-    io:format("Termination: ~p~n", [Reason]);
-
-terminate(Reason, _State, #{listen := Listen}) ->
-    gen_tcp:close(Listen),
     io:format("Termination: ~p~n", [Reason]).
 
 %%%===================================================================
@@ -76,77 +69,78 @@ connected(info, {tcp, _Socket, Packet}, Data=#{partial_message := PartialMessage
                   case jsone:try_decode(Message) of
                       {ok, MessageMap, <<>>} ->
                           gen_statem:cast(?MODULE, {message, MessageMap});
-                      {error, Reason} ->
+                      {error, _} ->
                           io:format("Couldn't decode message ~p~n", [Message])
                   end
               end,
               Messages2),
     {keep_state, Data#{partial_message := NewPartialMessage}};
 
-connected(cast, {message, Message}, _State) ->
+connected(cast, {message, Message}, _Data) ->
     io:format("Received message ~p~n", [Message]),
     keep_state_and_data;
 
-connected(info, {tcp_closed, _OldSocket}, Data=#{listen := _Listen}) ->
-    io:format("Connection closed~n"),
+connected(info, {tcp_closed, OldSocket}, Data) ->
+    io:format("Connection closed ~p~n", [OldSocket]),
     {next_state, waiting, Data};
 
-connected(cast, flash_lights, #{connection := Socket}) ->
-    io:format("Sending flash-lights command~n"),
-    gen_tcp:send(Socket, [<<"flash">>, <<0>>]),
+connected(info, {tcp_error, OldSocket, etimedout}, _Data) ->
+    io:format("Connection timeout ~p~n", [OldSocket]),
     keep_state_and_data;
 
 connected(cast, reboot_device, #{connection := Socket}) ->
     io:format("Sending reboot command~n"),
-    gen_tcp:send(Socket, [<<"reboot">>, <<0>>]),
+    gen_tcp:send(Socket, [jsone:encode([<<"reboot">>, #{}]), <<0>>]),
     keep_state_and_data;
 
-connected(cast, {activate_solenoid, SolenoidId, DurationSeconds}, #{connection := Socket}) ->
-    io:format("Sending command to activate solenoid ~p for ~p seconds~n", [SolenoidId, DurationSeconds]),
-    SolenoidIdStr = io_lib:format("~3..0B", [SolenoidId]),
-    DurationSecondsStr = io_lib:format("~5..0B", [DurationSeconds]),
-    gen_tcp:send(Socket, [<<"activate_solenoid">>, SolenoidIdStr, DurationSecondsStr, <<0>>]),
-    keep_state_and_data;
-
-connected(cast, update_device_app, #{connection := Socket}) ->
-    case file:read_file("../hello_ota.js") of
+connected(cast, {write_file, LocalFileName, DeviceFileName}, #{connection := Socket}) ->
+    case file:read_file(LocalFileName) of
         {ok, Content} ->
-            io:format("Updating device application~n"),
-            gen_tcp:send(Socket, [<<"update">>, <<0>>, integer_to_list(byte_size(Content)), <<0>>, Content, <<0>>]);
+            io:format("Writing file ~p to device file ~p with digest ~p~n", [LocalFileName, DeviceFileName, lists:sum(binary_to_list(Content))]),
+            gen_tcp:send(Socket, [jsone:encode([<<"writeFile">>, #{<<"fileName">> => DeviceFileName, <<"fileLength">> => byte_size(Content)}]), <<0>>, Content, <<0>>]);
         {error, Reason} ->
             io:format("Could not read application file: ~p~n", [Reason])
     end,
     keep_state_and_data;
 
-connected(Event, EventContent, Data) -> handle_common(Event, EventContent, Data).
-
-
-waiting(enter, _OldState, _Data=#{listen := Listen}) ->
-    spawn_link(?MODULE, listen, [Listen, self()]),
+connected(cast, {copy_file, CopyFromFileName, CopyToFileName}, #{connection := Socket}) ->
+    io:format("Copying file on device from ~p to ~p~n", [CopyFromFileName, CopyToFileName]),
+    gen_tcp:send(Socket, [jsone:encode([<<"copyFile">>, #{<<"copyFromFileName">> => CopyFromFileName, <<"copyToFileName">> => CopyToFileName}]), <<0>>]),
     keep_state_and_data;
 
-waiting(cast, {connection, Socket}, Data) ->
+connected(cast, {delete_file, FileName}, #{connection := Socket}) ->
+    io:format("Deleting file on device ~p~n", [FileName]),
+    gen_tcp:send(Socket, [jsone:encode([<<"deleteFile">>, #{<<"fileName">> => FileName}]), <<0>>]),
+    keep_state_and_data;
+
+connected(cast, flash_lights, #{connection := Socket}) ->
+    io:format("Sending flash-lights command~n"),
+    gen_tcp:send(Socket, [jsone:encode([<<"flash">>, #{}]), <<0>>]),
+    keep_state_and_data;
+
+connected(cast, {activate_solenoid, SolenoidId, DurationSeconds}, #{connection := Socket}) ->
+    io:format("Sending command to activate solenoid ~p for ~p seconds~n", [SolenoidId, DurationSeconds]),
+    gen_tcp:send(Socket, [jsone:encode([<<"activateSolenoid">>, #{<<"solenoidID">> => SolenoidId, <<"durationSeconds">> => DurationSeconds}]), <<0>>]),
+    keep_state_and_data;
+
+connected(Event, EventContent, Data) -> handle_common(connected, Event, EventContent, Data).
+
+
+waiting(enter, _OldState, _Data) ->
+    keep_state_and_data;
+
+waiting(cast, {connection, Socket, InitialPacket}, Data) ->
     io:format("New connection~n"),
     inet:setopts(Socket, [{active, true}]),
-    {next_state, connected, Data#{connection => Socket}};
+    {next_state, connected, Data#{connection => Socket, partial_message => <<>>},
+     [{next_event, info, {tcp, Socket, InitialPacket}}]};
 
-waiting(Event, EventContent, Data) -> handle_common(Event, EventContent, Data).
+waiting(Event, EventContent, Data) -> handle_common(waiting, Event, EventContent, Data).
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-handle_common(Event, EventContent, _Data) ->
-    io:format("Unhandled ~p: ~p~n", [Event, EventContent]),
+handle_common(State, Event, EventContent, _Data) ->
+    io:format("Unhandled event ~p in state '~p' with content: ~p~n", [Event, State, EventContent]),
     keep_state_and_data.
-
-
-listen(Listen, Receiver) ->
-    % gen_tcp:accept blocks until a connection arrives on Listen socket
-    case gen_tcp:accept(Listen) of
-        {ok, Accept} ->
-            ok = gen_tcp:controlling_process(Accept, Receiver),
-            gen_statem:cast(?MODULE, {connection, Accept});
-        {error, Reason} ->
-            io:format("Could not listen on socket: ~p~n", [Reason])
-    end.

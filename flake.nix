@@ -19,8 +19,6 @@
         shellHook = ''
           cd devices/irrigation_controller_js
 
-          npm run
-
           cat << EOF
 
           Install dependencies:
@@ -31,6 +29,19 @@
 
           Flash firmware (assumes board is connected at /dev/ttyUSB0, if not then update command in package.json)
               npm run flash-firmware
+
+          To flash app, first create config.js with the structure:
+              netConfig = {
+                  "wifiSSID": ...,
+                  "wifiPassword": ...,
+                  "serverIP": ...,
+                  "serverPort": ...,
+              };
+              deviceConfig = {
+                  "type": ...,
+                  "id": ...,
+              };
+          then flash mcu-base.js to .boot2, mcu-app.js to .boot1, and config.js to .boot0
           EOF
         '';
       };

@@ -5,14 +5,14 @@
   "main": "index.html",
   "scripts": {
     "download-firmware": "wget https://www.espruino.com/binaries/travis/master/espruino_2v15.138_esp32.tgz; tar xvf espruino_2v15.138_esp32.tgz; rm -f espruino_2v15.138_esp32.tgz",
-    "flash-firmware": "esptool.py --chip esp32 --port /dev/ttyUSB1 --baud 921600 write_flash -z --flash_mode dio --flash_freq 40m 0x1000 ./espruino_2v15.138_esp32/bootloader.bin 0x8000 ./espruino_2v15.138_esp32/partitions_espruino.bin 0x10000 ./espruino_2v15.138_esp32/espruino_esp32.bin",
+    "flash-firmware": "esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 write_flash -z --flash_mode dio --flash_freq 40m 0x1000 ./espruino_2v15.138_esp32/bootloader.bin 0x8000 ./espruino_2v15.138_esp32/partitions_espruino.bin 0x10000 ./espruino_2v15.138_esp32/espruino_esp32.bin",
     "build": "spago build && ./node_modules/rollup/dist/bin/rollup --format=cjs --file=dist/runPrintyBundle.js -- runPrinty.js && ls -lh dist",
     "run-printy": "node ./dist/runPrintyBundle.js",
     "patch": "sed -i 's/for (var \\([a-z]\\) in \\([a-z]*\\)) {/for (var \\1 in (\\2 || [])) {/g' dist/runPrintyBundle.js",
     "minify": "./node_modules/uglify-js/bin/uglifyjs dist/runPrintyBundle.js --output dist/runPrintyBundle.min.js --mangle --rename --no-annotations --toplevel --validate",
     "flash-printy-app": "./node_modules/espruino/bin/espruino-cli.js --no-ble -p /dev/ttyUSB0 -b 115200 -m --storage .boot0:dist/runPrintyBundle.js",
     "connect": "screen /dev/ttyUSB0 115200",
-    "flash-erase": "esptool.py --chip esp32 --port /dev/ttyUSB1 --baud 921600 erase_flash"
+    "flash-erase": "esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 erase_flash"
   },
   "author": "",
   "license": "ISC",

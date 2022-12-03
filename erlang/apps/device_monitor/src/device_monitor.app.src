@@ -5,7 +5,8 @@
   {mod, {device_monitor_app, []}},
   {applications,
    [kernel,
-    stdlib
+    stdlib,
+    gproc
    ]},
   {env,[]},
   {modules, []},
