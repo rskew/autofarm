@@ -1,3 +1,6 @@
+// Constants
+var connectTimeoutSeconds = 300;
+
 if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {
         console.log('Connected to Wifi.  IP address is:', details.ip);
@@ -17,9 +20,9 @@ var global_client;
 
 function connect_autofarm() {
     var timeout = setTimeout(function() {
-        console.log("Couldn't connect to autofarm within timeout");
+        console.log("Couldn't connect to autofarm within", connectTimeoutSeconds, "seconds");
         E.reboot();
-    }, 10000);
+    }, connectTimeoutSeconds * 1000);
     require("net").connect({host: netConfig.serverIP, port: netConfig.serverPort}, function(socket_client) {
         clearTimeout(timeout);
         global_client = socket_client;
@@ -28,7 +31,7 @@ function connect_autofarm() {
         global_client.on('data', streamParser());
         global_client.on('end', function() {
             console.log('client disconnected');
-            setTimeout(() => connect_autofarm(), 5000);
+            setTimeout(() => connect_autofarm(), 2000);
             global_client = undefined;
         });
     });
@@ -78,7 +81,7 @@ function streamParser() {
                     if ('handleCommand' in global) {
                         handleCommand(command, params);
                     } else {
-                        console.log("Unhandled command '", command, "' with params", params)
+                        console.log("Unhandled command '", command, "' with params", params);
                     }
                 }
             } catch (error) {
