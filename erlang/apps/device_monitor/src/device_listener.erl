@@ -7,20 +7,18 @@
 
 -export([listener/0, acceptor/1, dispatcher/1]).
 
--define(PORT, 9222).
 -define(DISPATCH_TIMEOUT, 10000).
 
 start_link() ->
-    io:format("hello start link"),
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    io:format("hello init"),
     spawn_link(?MODULE, listener, []),
     {ok, #{}}.
 
 listener() ->
-    case gen_tcp:listen(?PORT, [{active, false}, binary, {keepalive, true}, {reuseaddr, true}, {nodelay, true},
+    Port = list_to_integer(os:getenv("DEVICE_LISTENER_PORT")),
+    case gen_tcp:listen(Port, [{active, false}, binary, {keepalive, true}, {reuseaddr, true}, {nodelay, true},
                                 % https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h#L91
                                 %{raw, 6, 18, <<1:64/native>>}, % TCP_USER_TIMEOUT response timeout on send (including keepalives)
                                 {raw, 6, 4, <<1:64/native>>},  % TCP_KEEPIDLE time before first keepalive
@@ -28,10 +26,10 @@ listener() ->
                                 {raw, 6, 6, <<2:64/native>>}   % TCP_KEEPCNT number of keepalives before death
     ]) of
         {ok, Listen} ->
-            io:format("Listening on port ~p~n", [?PORT]),
+            io:format("Listening on port ~p~n", [Port]),
             acceptor(Listen);
         {error, Reason} ->
-            io:format("Couldn't listen on port ~p ~p~n", [?PORT, Reason]),
+            io:format("Couldn't listen on port ~p ~p~n", [Port, Reason]),
             timer:sleep(5000),
             listener()
     end.

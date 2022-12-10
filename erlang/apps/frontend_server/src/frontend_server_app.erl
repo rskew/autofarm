@@ -4,8 +4,6 @@
 
 -export([start/2, stop/1]).
 
--define(BASIC_AUTH_CREDENTIALS_FILE, "./apps/frontend_server/priv/basic_auth_credentials").
-
 start(_Type, _Args) ->
     {ok, User, Password} = load_basic_auth_credentials(),
     Dispatch = cowboy_router:compile([
@@ -27,7 +25,7 @@ stop(_State) ->
     ok = cowboy:stop_listener(hello).
 
 load_basic_auth_credentials() ->
-    {ok, PasswordFile} = file:open(?BASIC_AUTH_CREDENTIALS_FILE, [read]),
+    {ok, PasswordFile} = file:open(os:getenv("FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE"), [read]),
     {ok, Line} = file:read_line(PasswordFile),
     file:close(PasswordFile),
     [User, PasswordNL] = re:split(Line, ":"),

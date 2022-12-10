@@ -51,7 +51,9 @@
           pkgs.erlang
           pkgs.rebar3
         ];
-        ERL_FLAGS=" -args_file config/vm.args -config config/sys.config";
+        DEVICE_LISTENER_PORT = 9222;
+        ECRONTAB_FILE = "ecrontab";
+        FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = "frontend-server-basic-auth-credentials";
         shellHook = ''
           cd erlang
 
@@ -68,6 +70,55 @@
           pname = "autofarm";
           version = "0.1.0";
           releaseType = "release";
+        };
+      apps.x86_64-linux.autofarm-remsh =
+        let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
+              ${pkgs.erlang}/bin/erl -remsh autofarm -setcookie autofarm_cookie
+            '';
+        in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
+      nixosModule =
+        { lib, config, ... }:
+        let
+          cfg = config.services.autofarm;
+        in {
+          options.services.autofarm = {
+            deviceListenerPort = lib.mkOption {
+              type = lib.types.int;
+              default = 9222;
+              description = "Port for devices to connect on";
+            };
+            ecronServerEcrontab = lib.mkOption {
+              type = lib.types.path;
+              description = "Path to persist device action schedules";
+            };
+            frontendServerBasicAuthCredentialsFile = lib.mkOption {
+              type = lib.types.path;
+              description = "File containing 'user:password' for frontend authorization";
+            };
+          };
+          config = {
+            networking.firewall.allowedTCPPorts = [ cfg.deviceListenerPort ];
+            systemd.services.autofarm = {
+              description = "";
+              after = [ "network-pre.target" ];
+              wants = [ "network-pre.target" ];
+              wantedBy = [ "multi-user.target" ];
+              path = [pkgs.gawk];
+              environment = {
+                DEVICE_LISTENER_PORT = toString(cfg.deviceListenerPort);
+                ECRON_SERVER_ECRONTAB = cfg.ecronServerEcrontab;
+                FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = cfg.frontendServerBasicAuthCredentialsFile;
+              };
+              serviceConfig = {
+                Restart = "always";
+                RestartSec = 10;
+                StartLimitBurst = 8640;
+                StartLimitIntervalSec = 86400;
+                StartLimitInterval = 86400;
+                ExecStart = "${packages.x86_64-linux.autofarm}/bin/autofarm foreground";
+              };
+            };
+          };
         };
 
       devShells.x86_64-linux.mcu-test-purs = pkgs.mkShell rec {

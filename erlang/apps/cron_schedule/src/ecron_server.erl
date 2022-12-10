@@ -6,14 +6,15 @@
 
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, terminate/2]).
 
-% TODO make this configurable
--define(TABLE_FILE, "ecrontab").
 -define(TABLE_NAME, ecrontab).
 
 % ecron_server:list_cronjobs().
 % ecron_server:add_cronjob(hello, "*/20 * * * * *", {erlang, spawn, [fun() -> io:format("hello from ~p at ~p~n", [self(), calendar:now_to_datetime(now())]) end]}).
 % ecron_server:delete_cronjob(hello).
 % calendar:now_to_datetime(erlang:timestamp()).
+%
+% ecron_server:add_cronjob(water_tommies, "30 19 * * *", {device_monitor, activate_solenoid, [6, 1200]}).
+% ecron_server:add_cronjob(water_top_rows, "0 19 */2 * *", {device_monitor, activate_solenoid, [4, 1200]}).
 
 %%%===================================================================
 %%% API
@@ -36,10 +37,19 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    dets:open_file(?TABLE_NAME,
-                   [{file, ?TABLE_FILE},
-                    {type, set}
-                   ]),
+    TableFileName = os:getenv("ECRON_SERVER_ECRONTAB"),
+    case filelib:ensure_dir(TableFileName) of
+        ok -> true;
+        {error, ReasonMkdir} -> exit(ReasonMkdir)
+    end,
+    case dets:open_file(?TABLE_NAME,
+                        [{file, TableFileName},
+                         {type, set}
+                        ])
+    of
+      {ok, ?TABLE_NAME} -> true;
+      {error, ReasonOpen} -> exit(ReasonOpen)
+    end,
     [ecron:add(Name, Spec, Job) || {Name, Spec, Job} <- list_cronjobs_()],
     {ok, #{}}.
 
