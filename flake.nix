@@ -51,9 +51,10 @@
           pkgs.erlang
           pkgs.rebar3
         ];
-        DEVICE_LISTENER_PORT = 9222;
-        ECRONTAB_FILE = "ecrontab";
-        FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = "frontend-server-basic-auth-credentials";
+        AUTOFARM_DEVICE_LISTENER_PORT = 9222;
+        AUTOFARM_ECRON_SERVER_ECRONTAB = "ecrontab";
+        AUTOFARM_FRONTEND_SERVER_PORT = 8082;
+        AUTOFARM_FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = "frontend-server-basic-auth-credentials";
         shellHook = ''
           cd erlang
 
@@ -91,13 +92,18 @@
               type = lib.types.path;
               description = "Path to persist device action schedules";
             };
+            frontendServerPort = lib.mkOption {
+              type = lib.types.int;
+              default = 8082;
+              description = "Frontend server port";
+            };
             frontendServerBasicAuthCredentialsFile = lib.mkOption {
               type = lib.types.path;
               description = "File containing 'user:password' for frontend authorization";
             };
           };
           config = {
-            networking.firewall.allowedTCPPorts = [ cfg.deviceListenerPort ];
+            networking.firewall.allowedTCPPorts = [ cfg.deviceListenerPort cfg.frontendServerPort ];
             systemd.services.autofarm = {
               description = "";
               after = [ "network-pre.target" ];
@@ -105,9 +111,10 @@
               wantedBy = [ "multi-user.target" ];
               path = [pkgs.gawk];
               environment = {
-                DEVICE_LISTENER_PORT = toString(cfg.deviceListenerPort);
-                ECRON_SERVER_ECRONTAB = cfg.ecronServerEcrontab;
-                FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = cfg.frontendServerBasicAuthCredentialsFile;
+                AUTOFARM_DEVICE_LISTENER_PORT = toString(cfg.deviceListenerPort);
+                AUTOFARM_ECRON_SERVER_ECRONTAB = cfg.ecronServerEcrontab;
+                AUTOFARM_FRONTEND_SERVER_PORT = toString(cfg.frontendServerPort);
+                AUTOFARM_FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = cfg.frontendServerBasicAuthCredentialsFile;
               };
               serviceConfig = {
                 Restart = "always";

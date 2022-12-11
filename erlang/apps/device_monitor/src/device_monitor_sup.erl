@@ -33,10 +33,10 @@ init([]) ->
                     start => {device_listener, start_link, []},
                     restart => permanent,
                     modules => [device_listener]},
-                  #{id => device_monitor,
-                    start => {device_monitor, start_link, []},
+                  #{id => irrigation_controller_0,
+                    start => {irrigation_controller, start_link, [0]},
                     restart => permanent,
-                    modules => [device_monitor]}],
+                    modules => [irrigation_controller]}],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

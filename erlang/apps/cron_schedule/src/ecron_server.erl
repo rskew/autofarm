@@ -13,8 +13,8 @@
 % ecron_server:delete_cronjob(hello).
 % calendar:now_to_datetime(erlang:timestamp()).
 %
-% ecron_server:add_cronjob(water_tommies, "30 19 * * *", {device_monitor, activate_solenoid, [6, 1200]}).
-% ecron_server:add_cronjob(water_top_rows, "0 19 */2 * *", {device_monitor, activate_solenoid, [4, 1200]}).
+% ecron_server:add_cronjob(water_tommies, "30 19 * * *", {irrigation_controller, activate_solenoid, [0, 6, 1200]}).
+% ecron_server:add_cronjob(water_top_rows, "0 19 */2 * *", {irrigation_controller, activate_solenoid, [0, 4, 1200]}).
 
 %%%===================================================================
 %%% API
@@ -37,7 +37,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    TableFileName = os:getenv("ECRON_SERVER_ECRONTAB"),
+    TableFileName = os:getenv("AUTOFARM_ECRON_SERVER_ECRONTAB"),
     case filelib:ensure_dir(TableFileName) of
         ok -> true;
         {error, ReasonMkdir} -> exit(ReasonMkdir)

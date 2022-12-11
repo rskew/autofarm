@@ -1,5 +1,5 @@
 // Constants
-var connectTimeoutSeconds = 300;
+var connectTimeoutSeconds = 60;
 
 if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {
@@ -71,7 +71,7 @@ function streamParser() {
                 } else if (command == "deleteFile") {
                     console.log("Deleting file", params.fileName);
                     require('Storage').erase(params.fileName);
-                    writeMessage("update_state", {"file_name": params.deleteFileName, "exists": false, "timestamp_millis": Date.now()});
+                    writeMessage("update_state", {"file_name": params.fileName, "exists": false, "timestamp_millis": Date.now()});
                 } else if (command == "reboot") {
                     if (global_client) {
                         global_client.end();

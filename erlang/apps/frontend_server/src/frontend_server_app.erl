@@ -15,17 +15,19 @@ start(_Type, _Args) ->
             {"/", cowboy_static, {priv_file, frontend_server,     "../../../../frontend/dist/index.html"}},
             {"/[...]", cowboy_static, {priv_dir, frontend_server, "../../../../../../frontend/dist"}}
     ]}]),
+    Port = list_to_integer(os:getenv("AUTOFARM_FRONTEND_SERVER_PORT")),
     {ok, _} = cowboy:start_clear(hello,
-        [{port, 8081}],
+        [{port, Port}],
         #{env => #{dispatch => Dispatch}}
     ),
+    io:format("Frontend server started on port ~p~n", [Port]),
     frontend_server_sup:start_link().
 
 stop(_State) ->
     ok = cowboy:stop_listener(hello).
 
 load_basic_auth_credentials() ->
-    {ok, PasswordFile} = file:open(os:getenv("FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE"), [read]),
+    {ok, PasswordFile} = file:open(os:getenv("AUTOFARM_FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE"), [read]),
     {ok, Line} = file:read_line(PasswordFile),
     file:close(PasswordFile),
     [User, PasswordNL] = re:split(Line, ":"),
