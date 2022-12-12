@@ -63,6 +63,7 @@ handle_call({add_cronjob, Name, CronSpec, Job}, _From, State) ->
             {reply, {error, invalid_spec, CronSpec}, State};
       {ok, _} ->
             dets:insert(?TABLE_NAME, {Name, CronSpec, Job}),
+            ecron:delete(Name),
             ecron:add(Name, CronSpec, Job),
             {reply, ok, State}
     end;

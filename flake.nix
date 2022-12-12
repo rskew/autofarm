@@ -74,7 +74,7 @@
         };
       apps.x86_64-linux.autofarm-remsh =
         let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
-              ${pkgs.erlang}/bin/erl -remsh autofarm -setcookie autofarm_cookie
+              ${packages.x86_64-linux.autofarm}/bin/autofarm remote_console
             '';
         in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
       nixosModule =
