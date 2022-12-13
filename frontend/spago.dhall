@@ -28,10 +28,14 @@ to generate this file without the comments in this block.
   , "halogen-subscriptions"
   , "http-methods"
   , "maybe"
+  , "media-types"
   , "prelude"
   , "transformers"
+  , "web-dom"
   , "web-events"
+  , "web-html"
   , "web-socket"
+  , "web-uievents"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

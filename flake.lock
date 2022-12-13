@@ -54,7 +54,24 @@
     "root": {
       "inputs": {
         "nix-rebar3": "nix-rebar3",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "spago2nixSource": "spago2nixSource"
+      }
+    },
+    "spago2nixSource": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1641236534,
+        "narHash": "sha256-a5cBQdkFg98NC8mpKzfVm5Iv2DtMSLlr9IclWp5D8mI=",
+        "owner": "justinwoo",
+        "repo": "spago2nix",
+        "rev": "1c834738a8216a4c89d9defac9bf1c331d302a6a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "justinwoo",
+        "repo": "spago2nix",
+        "type": "github"
       }
     }
   },

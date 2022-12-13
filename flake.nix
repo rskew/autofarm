@@ -3,10 +3,13 @@
     nixpkgs.url = "nixpkgs/nixos-22.05";
     nix-rebar3.url = "github:axelf4/nix-rebar3";
     nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
+    spago2nixSource.url = "github:justinwoo/spago2nix";
+    spago2nixSource.flake = false;
   };
 
-  outputs = { self, nixpkgs, nix-rebar3 }:
+  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        spago2nix = import spago2nixSource { inherit pkgs; };
     in rec {
 
       devShells.x86_64-linux.mcu = pkgs.mkShell {
@@ -65,18 +68,24 @@
           EOF
         '';
       };
-      packages.x86_64-linux.autofarm =
-        (pkgs.callPackage nix-rebar3 {}).buildRebar3 {
-          root = ./erlang;
-          pname = "autofarm";
-          version = "0.1.0";
-          releaseType = "release";
-        };
       apps.x86_64-linux.autofarm-remsh =
         let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
               ${packages.x86_64-linux.autofarm}/bin/autofarm remote_console
             '';
         in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
+      packages.x86_64-linux.autofarm =
+        ((pkgs.callPackage nix-rebar3 {}).buildRebar3 {
+          root = ./erlang;
+          pname = "autofarm";
+          version = "0.1.0";
+          releaseType = "release";
+        }).overrideAttrs (finalAttrs: previousAttrs: {
+          preBuildPhases = [ "symlinkPrivToFrontend" ];
+          symlinkPrivToFrontend = ''
+            rm apps/frontend_server/priv
+            ln -s ${packages.x86_64-linux.frontend} apps/frontend_server/priv
+          '';
+        });
       nixosModule =
         { lib, config, ... }:
         let
@@ -127,6 +136,63 @@
             };
           };
         };
+
+      devShells.x86_64-linux.frontend = pkgs.mkShell {
+        buildInputs = [
+          pkgs.spago
+          pkgs.purescript
+          pkgs.nodejs
+          pkgs.nodePackages.node2nix
+          spago2nix
+        ];
+        shellHook = ''
+          cd frontend
+
+          cat << EOF
+          Development build:
+              spago build
+
+          Serve development version from development backend:
+              cd ..
+              nix develop .#autofarm
+              rebar3 shell
+          development version of frontend now served at 'localhost:8082/assets/index.html'
+
+          On update to purescript dependencies, regenerate nix-ified version for prod build:
+              spago2nix generate
+          EOF
+        '';
+      };
+      packages.x86_64-linux.frontend =
+        let
+          spagoPackages = import ./frontend/spago-packages.nix { inherit pkgs; };
+          builtPursSources = spagoPackages.mkBuildProjectOutput {
+            src = ./frontend/src;
+            purs = pkgs.purescript;
+          };
+        in pkgs.stdenv.mkDerivation {
+          name = "autofarm-frontend";
+          src = ./frontend/src;
+          assets = ./frontend/assets;
+          buildInputs = [
+            pkgs.esbuild
+            pkgs.purescript
+            pkgs.nodejs
+            builtPursSources
+          ];
+          buildPhase = ''
+            cd ..
+            mkdir -p dist
+            cp -r $assets/* dist/
+            rm dist/index.js # remove index.js used for development
+            echo 'import { main } from "${builtPursSources}/output/Main/index.js"; main();' > index.js
+            esbuild --bundle index.js --outfile=dist/index.js
+          '';
+          installPhase = ''
+            mkdir -p $out
+            cp -r dist/* $out/
+          '';
+      };
 
       devShells.x86_64-linux.mcu-test-purs = pkgs.mkShell rec {
         buildPrinty = pkgs.writeShellScriptBin "buildPrinty" ''

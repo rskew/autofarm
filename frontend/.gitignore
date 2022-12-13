@@ -10,3 +10,4 @@
 /.spago
 dist
 .parcel-cache
+.spago2nix
