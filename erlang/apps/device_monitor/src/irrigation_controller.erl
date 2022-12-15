@@ -43,7 +43,7 @@ callback_mode() ->
     [state_functions, state_enter].
 
 init(ID) ->
-    {ok, waiting, #{device_id => ID}}.
+    {ok, waiting, #{device_id => ID, connection => false}}.
 
 terminate(Reason, _State, #{connection := Socket}) ->
     gen_tcp:close(Socket),
@@ -113,17 +113,22 @@ connected(Event, EventContent, Data) -> handle_common(connected, Event, EventCon
 waiting(enter, _OldState, _Data) ->
     keep_state_and_data;
 
-waiting(cast, {connection, Socket, InitialPacket}, Data) ->
-    io:format("New connection~n"),
-    inet:setopts(Socket, [{active, true}]),
-    {next_state, connected, Data#{connection => Socket, parser_state => device_monitor:empty_parser_state()},
-     [{next_event, info, {tcp, Socket, InitialPacket}}]};
-
 waiting(Event, EventContent, Data) -> handle_common(waiting, Event, EventContent, Data).
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+handle_common(_State, cast, {connection, Socket, InitialPacket}, Data=#{connection := OldSocket}) ->
+    io:format("New connection~n"),
+    if OldSocket =/= false ->
+           io:format("Closing old connection~n"),
+           gen_tcp:close(OldSocket);
+       true -> true
+    end,
+    inet:setopts(Socket, [{active, true}]),
+    {next_state, connected, Data#{connection => Socket, parser_state => device_monitor:empty_parser_state()},
+     [{next_event, info, {tcp, Socket, InitialPacket}}]};
 
 handle_common(State, Event, EventContent, _Data) ->
     io:format("Unhandled event ~p in state '~p' with content: ~p~n", [Event, State, EventContent]),
