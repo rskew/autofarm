@@ -5,6 +5,8 @@ let batteryReading = analogRead(D35);
 
 // Constants
 const batteryReadingSmoothingCoefficient = 0.998;
+const batteryReadingIntervalMilliseconds = 100;
+const batteryReadingReportingIntervalSeconds = 60;
 
 // Battery voltage read via a 1/11 voltage divider
 // Calibration:
@@ -55,16 +57,16 @@ function handleCommand(command, params) {
     }
 }
 
-// Read battery voltage every tenth of a second, smoothing readings
+// Read battery voltage, smoothing readings
 setInterval(function() {
     readBatteryVoltage();
-}, 100);
+}, batteryReadingIntervalMilliseconds);
 
-// Send battery voltage to server every 10 seconds
+// Send battery voltage to server
 setInterval(function() {
     if ('global_client' in global && global_client !== undefined) {
         writeMessage("update_state", {"battery_voltage": batteryReading, "timestamp_millis": Date.now()});
     }
-}, 10000);
+}, batteryReadingReportingIntervalSeconds * 1000);
 
 flash();

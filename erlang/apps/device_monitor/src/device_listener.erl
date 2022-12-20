@@ -22,8 +22,8 @@ listener() ->
                                 % https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h#L91
                                 %{raw, 6, 18, <<1:64/native>>}, % TCP_USER_TIMEOUT response timeout on send (including keepalives)
                                 {raw, 6, 4, <<1:64/native>>},  % TCP_KEEPIDLE time before first keepalive
-                                {raw, 6, 5, <<1:64/native>>},  % TCP_KEEPINTVL interval between keepalives
-                                {raw, 6, 6, <<2:64/native>>}   % TCP_KEEPCNT number of keepalives before death
+                                {raw, 6, 5, <<2:64/native>>},  % TCP_KEEPINTVL interval between keepalives
+                                {raw, 6, 6, <<5:64/native>>}   % TCP_KEEPCNT number of keepalives before death
     ]) of
         {ok, Listen} ->
             io:format("Listening on port ~p~n", [Port]),

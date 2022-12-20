@@ -120,9 +120,9 @@ waiting(Event, EventContent, Data) -> handle_common(waiting, Event, EventContent
 %%%===================================================================
 
 handle_common(_State, cast, {connection, Socket, InitialPacket}, Data=#{connection := OldSocket}) ->
-    io:format("New connection~n"),
+    io:format("New connection ~p~n", [Socket]),
     if OldSocket =/= false ->
-           io:format("Closing old connection~n"),
+           io:format("Closing old connection ~p~n", [OldSocket]),
            gen_tcp:close(OldSocket);
        true -> true
     end,

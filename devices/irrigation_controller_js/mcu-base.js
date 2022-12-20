@@ -1,5 +1,6 @@
 // Constants
 var connectTimeoutSeconds = 60;
+var wifiDisconnectRebootDelaySeconds = 5;
 
 if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {
@@ -8,8 +9,8 @@ if ('netConfig' in global && 'deviceConfig' in global) {
         connect_autofarm();
     });
     require('Wifi').on('disconnected', function() {
-        console.log("Unable to connect to wifi ssid", netConfig.wifiSSID);
-        E.reboot();
+        console.log("Unable to connect to wifi ssid", netConfig.wifiSSID, "rebooting in", wifiDisconnectRebootDelaySeconds, "seconds");
+        setTimeout(() => E.reboot(), wifiDisconnectRebootDelaySeconds * 1000);
     });
     require('Wifi').connect(netConfig.wifiSSID, {password: netConfig.wifiPassword});
 } else {
