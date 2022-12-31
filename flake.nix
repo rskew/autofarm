@@ -1,15 +1,18 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-22.05";
-    nix-rebar3.url = "github:axelf4/nix-rebar3";
+    nixpkgs.url = "nixpkgs/nixos-22.11";
+    # TODO
+    nix-rebar3.url = "/home/rowan/projects/nix-rebar3";
     nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
-    spago2nixSource.url = "github:justinwoo/spago2nix";
-    spago2nixSource.flake = false;
+    spago2nix.url = "github:justinwoo/spago2nix";
+    spago2nix.inputs.nixpkgs.follows = "nixpkgs";
+    # TODO
+    purerl.url = "/home/rowan/projects/nixpkgs-purerl";
+    purerl.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource }:
+  outputs = { self, nixpkgs, nix-rebar3, spago2nix, purerl }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
-        spago2nix = import spago2nixSource { inherit pkgs; };
     in rec {
 
       devShells.x86_64-linux.mcu = pkgs.mkShell {
@@ -68,11 +71,52 @@
           EOF
         '';
       };
-      apps.x86_64-linux.autofarm-remsh =
-        let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
-              ${packages.x86_64-linux.autofarm}/bin/autofarm remote_console
-            '';
-        in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
+      devShells.x86_64-linux.autofarm-purerl = pkgs.mkShell {
+        buildInputs = [
+          pkgs.spago
+          pkgs.purescript
+          purerl.packages.x86_64-linux.purerl-0-0-18
+          spago2nix
+        ];
+        shellHook = ''
+          cd erlang/apps/purerl_task_scheduler
+
+          cat << EOF
+          Development build:
+              spago build
+
+          Then test as part of erlang system:
+              cd ../../../; nix develop .#autofarm; rebar3 shell
+
+          On update to purescript dependencies, regenerate nix-ified version for prod build:
+              spago2nix generate
+          EOF
+        '';
+      };
+      packages.x86_64-linux.autofarm-purerl =
+        let
+          spagoPackages = import ./erlang/apps/purerl_task_scheduler/spago-packages.nix { inherit pkgs; };
+          # Customised version of spagoPackages.mkBuildProjectOutput that uses purs to compile .purs to corefn, then runs purerl
+          mkBuildProjectOutput = { src, purs }:
+            pkgs.stdenv.mkDerivation {
+              name = "build-project-output";
+              src = src;
+              buildInputs = [ purs purerl.packages.x86_64-linux.purerl-0-0-18 ];
+              installPhase = ''
+                mkdir -p $out
+                purs compile "$src/**/*.purs" ${builtins.toString
+                  (builtins.map
+                    (x: ''"${x.outPath}/src/**/*.purs"'')
+                    (builtins.attrValues spagoPackages.inputs))} --codegen corefn
+                purerl
+                mv output $out
+              '';
+            };
+          builtPursSources = mkBuildProjectOutput {
+            src = ./erlang/apps/purerl_task_scheduler;
+            purs = pkgs.purescript;
+          };
+        in builtPursSources;
       packages.x86_64-linux.autofarm =
         ((pkgs.callPackage nix-rebar3 {}).buildRebar3 {
           root = ./erlang;
@@ -80,7 +124,11 @@
           version = "0.1.0";
           releaseType = "release";
         }).overrideAttrs (finalAttrs: previousAttrs: {
-          preBuildPhases = [ "symlinkPrivToFrontend" ];
+          preBuildPhases = [ "symlinkPurerl" "symlinkPrivToFrontend" ];
+          symlinkPurerl = ''
+            rm apps/purerl_task_scheduler/src/output
+            ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/purerl_task_scheduler/src/output
+          '';
           symlinkPrivToFrontend = ''
             rm apps/frontend_server/priv
             ln -s ${packages.x86_64-linux.frontend} apps/frontend_server/priv
@@ -136,6 +184,11 @@
             };
           };
         };
+      apps.x86_64-linux.autofarm-remsh =
+        let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
+              ${packages.x86_64-linux.autofarm}/bin/autofarm remote_console
+            '';
+        in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
 
       devShells.x86_64-linux.frontend = pkgs.mkShell {
         buildInputs = [

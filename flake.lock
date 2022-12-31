@@ -1,6 +1,37 @@
 {
   "nodes": {
+    "easy-purescript-nix": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1670198178,
+        "narHash": "sha256-5KkyNpPakv4xIP2ba0S5GX+dcmd3AcO9kPhwa482BbA=",
+        "owner": "justinwoo",
+        "repo": "easy-purescript-nix",
+        "rev": "7a4cb3cd6ca53566ea1675692eab0aa13907ff09",
+        "type": "github"
+      },
+      "original": {
+        "owner": "justinwoo",
+        "repo": "easy-purescript-nix",
+        "type": "github"
+      }
+    },
     "flake-utils": {
+      "locked": {
+        "lastModified": 1667395993,
+        "narHash": "sha256-nuEHfE/LcWyuSWnS8t12N1wc105Qtau+/OdUAjtQ0rA=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "5aed5285a952e0b949eb3ba02c12fa4fcfef535f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "flake-utils_2": {
       "locked": {
         "lastModified": 1667395993,
         "narHash": "sha256-nuEHfE/LcWyuSWnS8t12N1wc105Qtau+/OdUAjtQ0rA=",
@@ -24,48 +55,69 @@
       },
       "locked": {
         "lastModified": 1668516809,
-        "narHash": "sha256-amqFlz04lw88XRtbRTQe5XSDHHUV0Wf1zDtIQ6XNhM8=",
-        "owner": "axelf4",
-        "repo": "nix-rebar3",
-        "rev": "a9eeef712bcaf1f01cf47cdef24260d7137d79d2",
-        "type": "github"
+        "narHash": "sha256-LjCFq4Zq4Qww/yY9TUDQJ457ukkaplIKxSamVXSdzrk=",
+        "type": "git",
+        "url": "file:///home/rowan/projects/nix-rebar3"
       },
       "original": {
-        "owner": "axelf4",
-        "repo": "nix-rebar3",
-        "type": "github"
+        "type": "git",
+        "url": "file:///home/rowan/projects/nix-rebar3"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1670538458,
-        "narHash": "sha256-mvKmBkdlhzsMBtnzYXjYn08EGw9rFBEE9hp4Uqgol1Q=",
+        "lastModified": 1672353432,
+        "narHash": "sha256-oZfgp/44/o2tWiylV30cR+DLyWTJ+5dhsdWZVpzs3e4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "99ec06122f481588abafd91f2710d80a5320efe6",
+        "rev": "913a47cd064cc06440ea84e5e0452039a85781f0",
         "type": "github"
       },
       "original": {
         "id": "nixpkgs",
-        "ref": "nixos-22.05",
+        "ref": "nixos-22.11",
         "type": "indirect"
+      }
+    },
+    "purerl": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1665133731,
+        "narHash": "sha256-VXX1ZI0FBObI8tH5x38obWu2G0G6dBSTfNrfBC89s7k=",
+        "type": "git",
+        "url": "file:///home/rowan/projects/nixpkgs-purerl"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/rowan/projects/nixpkgs-purerl"
       }
     },
     "root": {
       "inputs": {
         "nix-rebar3": "nix-rebar3",
         "nixpkgs": "nixpkgs",
-        "spago2nixSource": "spago2nixSource"
+        "purerl": "purerl",
+        "spago2nix": "spago2nix"
       }
     },
-    "spago2nixSource": {
-      "flake": false,
+    "spago2nix": {
+      "inputs": {
+        "easy-purescript-nix": "easy-purescript-nix",
+        "flake-utils": "flake-utils_2",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1641236534,
-        "narHash": "sha256-a5cBQdkFg98NC8mpKzfVm5Iv2DtMSLlr9IclWp5D8mI=",
+        "lastModified": 1671225584,
+        "narHash": "sha256-h9r67pmvDuA3TV9299L4CN60XSm8RRtX1EwUoKu9Pyw=",
         "owner": "justinwoo",
         "repo": "spago2nix",
-        "rev": "1c834738a8216a4c89d9defac9bf1c331d302a6a",
+        "rev": "1b8ec352bc7eac077b934d6b9f6efa0129926e59",
         "type": "github"
       },
       "original": {

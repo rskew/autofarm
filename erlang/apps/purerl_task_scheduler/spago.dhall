@@ -1,0 +1,41 @@
+{-
+-}
+{ name = "purerl-task-scheduler"
+, dependencies =
+  [ "console"
+  , "control"
+  , "datetime"
+  , "effect"
+  , "either"
+  , "erl-atom"
+  , "erl-binary"
+  , "erl-cowboy"
+  , "erl-kernel"
+  , "erl-lists"
+  , "erl-logger"
+  , "erl-maps"
+  , "erl-modules"
+  , "erl-pinto"
+  , "erl-process"
+  , "erl-simplebus"
+  , "erl-stetson"
+  , "erl-tuples"
+  , "filterable"
+  , "foldable-traversable"
+  , "foreign"
+  , "maybe"
+  , "newtype"
+  , "partial"
+  , "prelude"
+  , "psci-support"
+  , "record"
+  , "routing-duplex"
+  , "simple-json"
+  , "transformers"
+  , "typelevel-prelude"
+  , "unsafe-coerce"
+  ]
+, packages = ./packages.dhall
+, sources = [ "*.purs" ]
+, backend = "purerl"
+}
