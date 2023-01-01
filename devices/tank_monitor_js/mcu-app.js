@@ -5,16 +5,25 @@ D26.mode("input_pullup");
 D27.mode("input_pullup");
 digitalWrite(D5, 0);
 
+// Battery voltage read via a 1/1 voltage divider
+// Calibration (after voltage divider):
+// - 1.85 -> 0.541
+// - 2.25 -> 0.666
+// - 1.5 -> 0.432
+// Apply calibration then multiply by 2 for voltage divider
+const batteryCalibrationScaleFactor = 3.4 * 2;
+
 // State variables
-let batteryReading = analogRead(D35);
+let batteryReading = analogRead(D35) * batteryCalibrationScaleFactor;
 let tankLevelDistanceReadingCentimeters = 0.0;
 let lastTankLevelDistanceReadingRaw;
 
 // Constants
+
 const deepSleepDurationSeconds = 300;
 const wakeDurationSeconds = 30;
 const batteryReadingSmoothingCoefficient = 0.998;
-const batteryReadingIntervalMilliseconds = 100;
+const batteryReadingIntervalMilliseconds = 50;
 const batteryReadingReportingIntervalSeconds = 10;
 const tankLevelDistanceReadingSmoothingCoefficient = 0.990;
 const tankLevelDistanceReadingIntervalMilliseconds = 500;
@@ -48,15 +57,9 @@ function reportTankLevel() {
     }
 }
 
-// Battery voltage read via a 1/1 voltage divider
-// Calibration (after voltage divider):
-// - 1.85 -> 0.541
-// - 2.25 -> 0.666
-// - 1.5 -> 0.432
 function readBatteryVoltage() {
     let reading = analogRead(D35);
-    // Apply calibration then multiply by 2 for voltage divider
-    let calibratedReading = reading * 3.4 * 2
+    let calibratedReading = reading * batteryCalibrationScaleFactor
     batteryReading = batteryReading * batteryReadingSmoothingCoefficient + calibratedReading * (1 - batteryReadingSmoothingCoefficient);
 }
 
