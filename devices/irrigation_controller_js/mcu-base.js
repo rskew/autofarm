@@ -1,6 +1,6 @@
 // Constants
 var connectTimeoutSeconds = 60;
-var wifiDisconnectRebootDelaySeconds = 5;
+var wifiDisconnectRebootDelaySeconds = 35;
 
 if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {

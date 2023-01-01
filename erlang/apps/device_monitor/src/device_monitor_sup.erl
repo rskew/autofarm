@@ -40,7 +40,11 @@ init([]) ->
                   #{id => tank_monitor_0,
                     start => {tank_monitor, start_link, [0]},
                     restart => permanent,
-                    modules => [tank_monitor]}
+                    modules => [tank_monitor]},
+                  #{id => staging_device_0,
+                    start => {staging_device, start_link, [0]},
+                    restart => permanent,
+                    modules => [staging_device]}
                   ],
     {ok, {SupFlags, ChildSpecs}}.
 
