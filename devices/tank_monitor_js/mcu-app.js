@@ -49,9 +49,15 @@ function reportTankLevel() {
 }
 
 // Battery voltage read via a 1/1 voltage divider
+// Calibration (after voltage divider):
+// - 1.85 -> 0.541
+// - 2.25 -> 0.666
+// - 1.5 -> 0.432
 function readBatteryVoltage() {
     let reading = analogRead(D35);
-    batteryReading = batteryReading * batteryReadingSmoothingCoefficient + reading * (1 - batteryReadingSmoothingCoefficient);
+    // Apply calibration then multiply by 2 for voltage divider
+    let calibratedReading = reading * 3.4 * 2
+    batteryReading = batteryReading * batteryReadingSmoothingCoefficient + calibratedReading * (1 - batteryReadingSmoothingCoefficient);
 }
 
 function flash() {
