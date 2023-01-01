@@ -18,10 +18,11 @@ if ('netConfig' in global && 'deviceConfig' in global) {
 }
 
 var globalClient;
+var connectionRetries = 0;
 
 function connectAutofarm() {
     var timeout = setTimeout(function() {
-        console.log("Couldn't connect to autofarm within", connectTimeoutSeconds, "seconds");
+        console.log("Couldn't connect to autofarm within", connectTimeoutSeconds, "seconds, rebooting");
         E.reboot();
     }, connectTimeoutSeconds * 1000);
     require("net").connect({host: netConfig.serverIP, port: netConfig.serverPort}, function(socket_client) {
@@ -32,6 +33,11 @@ function connectAutofarm() {
         globalClient.on('data', streamParser());
         globalClient.on('end', function() {
             console.log('client disconnected');
+            connectionRetries += 1;
+            if (connectionRetries > 10) {
+                console.log('Max connection retries exceeded, rebooting');
+                E.reboot();
+            }
             setTimeout(() => connectAutofarm(), 2000);
             globalClient = undefined;
         });
