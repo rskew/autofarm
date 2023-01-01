@@ -21,7 +21,7 @@ let lastTankLevelDistanceReadingRaw;
 // Constants
 
 const deepSleepDurationSeconds = 300;
-const wakeDurationSeconds = 30;
+const wakeDurationSeconds = 31;
 const batteryReadingSmoothingCoefficient = 0.998;
 const batteryReadingIntervalMilliseconds = 50;
 const batteryReadingReportingIntervalSeconds = 10;
