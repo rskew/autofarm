@@ -36,7 +36,12 @@ init([]) ->
                   #{id => irrigation_controller_0,
                     start => {irrigation_controller, start_link, [0]},
                     restart => permanent,
-                    modules => [irrigation_controller]}],
+                    modules => [irrigation_controller]},
+                  #{id => tank_monitor_0,
+                    start => {tank_monitor, start_link, [0]},
+                    restart => permanent,
+                    modules => [tank_monitor]}
+                  ],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

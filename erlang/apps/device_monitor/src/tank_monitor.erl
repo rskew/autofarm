@@ -1,14 +1,14 @@
--module(irrigation_controller).
+-module(tank_monitor).
 
 -behaviour(gen_statem).
 
--export([reboot_device/1, write_file_to_device/3, copy_file_on_device/3, delete_file_on_device/2,
-         flash_lights/1, activate_solenoid/3]).
+-export([reboot_device/1, stay_awake/1, write_file_to_device/3, copy_file_on_device/3, delete_file_on_device/2,
+         flash_lights/1, read_tank_level_sensor/1]).
 
 -export([start_link/1, init/1, callback_mode/0, terminate/3]).
 -export([waiting/3, connected/3]).
 
--define(MODBIN, <<"irrigation_controller">>).
+-define(MODBIN, <<"tank_monitor">>).
 
 %%%===================================================================
 %%% API
@@ -20,8 +20,11 @@ flash_lights(DeviceID) ->
 reboot_device(DeviceID) ->
     gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, reboot_device).
 
-activate_solenoid(DeviceID, SolenoidId, DurationSeconds) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {activate_solenoid, SolenoidId, DurationSeconds}).
+read_tank_level_sensor(DeviceID) ->
+    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, read_tank_level_sensor).
+
+stay_awake(DeviceID) ->
+    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, stay_awake).
 
 write_file_to_device(DeviceID, LocalFileName, DeviceFileName) ->
     gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {write_file, LocalFileName, DeviceFileName}).
@@ -61,7 +64,7 @@ connected(info, {tcp, _Socket, Packet}, Data=#{parser_state := ParserState}) ->
     {keep_state, Data#{parser_state => NewParserState}};
 
 connected(cast, {message, Message}, _Data=#{device_id := DeviceID}) ->
-    io:format("Received message from irrigation_controller ~p:~n~p~n", [DeviceID, Message]),
+    io:format("Received message from tank_monitor ~p:~n~p~n", [DeviceID, Message]),
     keep_state_and_data;
 
 connected(info, {tcp_closed, OldSocket}, Data) ->
@@ -75,6 +78,11 @@ connected(info, {tcp_error, OldSocket, etimedout}, _Data) ->
 connected(cast, reboot_device, #{connection := Socket}) ->
     io:format("Sending reboot command~n"),
     gen_tcp:send(Socket, device_monitor:format_command(<<"reboot">>, #{})),
+    keep_state_and_data;
+
+connected(cast, stay_awake, #{connection := Socket}) ->
+    io:format("Sending stay-awake command~n"),
+    gen_tcp:send(Socket, device_monitor:format_command(<<"stayAwake">>, #{})),
     keep_state_and_data;
 
 connected(cast, {write_file, LocalFileName, DeviceFileName}, #{connection := Socket}) ->
@@ -103,9 +111,9 @@ connected(cast, flash_lights, #{connection := Socket}) ->
     gen_tcp:send(Socket, device_monitor:format_command(<<"flash">>, #{})),
     keep_state_and_data;
 
-connected(cast, {activate_solenoid, SolenoidId, DurationSeconds}, #{connection := Socket}) ->
-    io:format("Sending command to activate solenoid ~p for ~p seconds~n", [SolenoidId, DurationSeconds]),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"activateSolenoid">>, #{<<"solenoidID">> => SolenoidId, <<"durationSeconds">> => DurationSeconds})),
+connected(cast, read_tank_level_sensor, #{connection := Socket}) ->
+    io:format("Sending command to read tank level sensor~n"),
+    gen_tcp:send(Socket, device_monitor:format_command(<<"readTankLevelSensor">>, #{})),
     keep_state_and_data;
 
 connected(Event, EventContent, Data) -> handle_common(connected, Event, EventContent, Data).

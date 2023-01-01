@@ -6,7 +6,7 @@ if ('netConfig' in global && 'deviceConfig' in global) {
     require('Wifi').on('connected', function (details) {
         console.log('Connected to Wifi.  IP address is:', details.ip);
         console.log('Connecting to erlang at ', netConfig.serverIP, netConfig.serverPort);
-        connect_autofarm();
+        connectAutofarm();
     });
     require('Wifi').on('disconnected', function() {
         console.log("Unable to connect to wifi ssid", netConfig.wifiSSID, "rebooting in", wifiDisconnectRebootDelaySeconds, "seconds");
@@ -17,29 +17,29 @@ if ('netConfig' in global && 'deviceConfig' in global) {
     console.log("Create netConfig and deviceConfig values in .boot0 file");
 }
 
-var global_client;
+var globalClient;
 
-function connect_autofarm() {
+function connectAutofarm() {
     var timeout = setTimeout(function() {
         console.log("Couldn't connect to autofarm within", connectTimeoutSeconds, "seconds");
         E.reboot();
     }, connectTimeoutSeconds * 1000);
     require("net").connect({host: netConfig.serverIP, port: netConfig.serverPort}, function(socket_client) {
         clearTimeout(timeout);
-        global_client = socket_client;
+        globalClient = socket_client;
         console.log('client connected');
         writeMessage("connect", {"type": deviceConfig.type, "id": deviceConfig.id});
-        global_client.on('data', streamParser());
-        global_client.on('end', function() {
+        globalClient.on('data', streamParser());
+        globalClient.on('end', function() {
             console.log('client disconnected');
-            setTimeout(() => connect_autofarm(), 2000);
-            global_client = undefined;
+            setTimeout(() => connectAutofarm(), 2000);
+            globalClient = undefined;
         });
     });
 }
 
 function writeMessage(command, paramsObj) {
-    global_client.write(JSON.stringify([command, paramsObj]) + '\0');
+    globalClient.write(JSON.stringify([command, paramsObj]) + '\0');
 }
 
 function streamParser() {
@@ -74,8 +74,8 @@ function streamParser() {
                     require('Storage').erase(params.fileName);
                     writeMessage("update_state", {"file_name": params.fileName, "exists": false, "timestamp_millis": Date.now()});
                 } else if (command == "reboot") {
-                    if (global_client) {
-                        global_client.end();
+                    if (globalClient) {
+                        globalClient.end();
                     }
                     E.reboot();
                 } else {

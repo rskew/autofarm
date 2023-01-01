@@ -64,7 +64,7 @@ setInterval(function() {
 
 // Send battery voltage to server
 setInterval(function() {
-    if ('global_client' in global && global_client !== undefined) {
+    if ('globalClient' in global && globalClient !== undefined) {
         writeMessage("update_state", {"battery_voltage": batteryReading, "timestamp_millis": Date.now()});
     }
 }, batteryReadingReportingIntervalSeconds * 1000);
