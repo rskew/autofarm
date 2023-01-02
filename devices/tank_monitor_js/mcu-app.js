@@ -1,5 +1,3 @@
-//ESP32.enableBLE(false);
-
 // Set mode for float switch pins
 D26.mode("input_pullup");
 D27.mode("input_pullup");
