@@ -17,6 +17,7 @@ const batteryCalibrationScaleFactor = 3.4 * 2;
 let batteryReading = analogRead(D35) * batteryCalibrationScaleFactor;
 let tankLevelDistanceReadingCentimeters = 0.0;
 let lastTankLevelDistanceReadingRaw;
+let unsentTankLevelReading = false;
 
 // Constants
 
@@ -33,6 +34,7 @@ const tankLevelSensorMountHeightCentimeters = 200
 const tankLevelSensor = require("HC-SR04").connect(D25, D34, function(distanceCentimeters) {
     lastTankLevelDistanceReadingRaw = distanceCentimeters;
     if (distanceCentimeters < 1000) {
+        unsentTankLevelReading = true;
         if (tankLevelDistanceReadingCentimeters == 0.0) {
             tankLevelDistanceReadingCentimeters = distanceCentimeters;
         } else {
@@ -48,12 +50,16 @@ function readTankLevel() {
 
 function reportTankLevel() {
     if ('globalClient' in global && globalClient !== undefined) {
-        let tankLevelReadingMeters = (tankLevelSensorMountHeightCentimeters - tankLevelDistanceReadingCentimeters) * 0.01;
-        writeMessage("update_state", {"tank_level_meters": tankLevelReadingMeters,
-                                      "tank_float_switch_upper": digitalRead(D26) ? "up" : "down",
-                                      "tank_float_switch_lower": digitalRead(D27) ? "up" : "down",
-                                      "last_tank_level_distance_reading_raw": lastTankLevelDistanceReadingRaw,
-                                      "timestamp_millis": Date.now()});
+        let message = {"tank_float_switch_upper": digitalRead(D26) ? "up" : "down",
+                       "tank_float_switch_lower": digitalRead(D27) ? "up" : "down",
+                       "timestamp_millis": Date.now()};
+        if (unsentTankLevelReading) {
+            let tankLevelReadingMeters = (tankLevelSensorMountHeightCentimeters - tankLevelDistanceReadingCentimeters) * 0.01;
+            message["last_tank_level_distance_reading_centimeters"] = lastTankLevelDistanceReadingRaw;
+            message["tank_level_meters"] = tankLevelReadingMeters;
+        };
+        writeMessage("update_state", message);
+        unsentTankLevelReading = false;
     }
 }
 
