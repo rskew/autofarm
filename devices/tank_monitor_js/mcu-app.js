@@ -1,33 +1,34 @@
 // Set mode for float switch pins
 D26.mode("input_pullup");
 D27.mode("input_pullup");
+digitalWrite(D4, 0);
 digitalWrite(D5, 0);
 
-// Battery voltage read via a 1/1 voltage divider
+// Battery voltage read via a 10:1 voltage divider
 // Calibration (after voltage divider):
-// - 1.85 -> 0.541
-// - 2.25 -> 0.666
-// - 1.5 -> 0.432
-// Apply calibration then multiply by 2 for voltage divider
-const batteryCalibrationScaleFactor = 3.4 * 2;
+// - battery 10V, reading 2.570 / 11
+// - battery 12V, reading 3.175 / 11
+// - battery 13V, reading 3.480 / 11
+// - battery 15V, reading 4.085 / 11
+const applyBatteryVoltageCalibration = function(rawReading) {
+    return rawReading * 36.3 + 1.52
+}
 
 // State variables
-let batteryReading = analogRead(D35) * batteryCalibrationScaleFactor;
+let batteryReading = applyBatteryVoltageCalibration(analogRead(D35));
 let tankLevelDistanceReadingCentimeters = 0.0;
 let lastTankLevelDistanceReadingRaw;
 let unsentTankLevelReading = false;
 
 // Constants
 
-const deepSleepDurationSeconds = 300;
-const wakeDurationSeconds = 31;
 const batteryReadingSmoothingCoefficient = 0.998;
 const batteryReadingIntervalMilliseconds = 50;
 const batteryReadingReportingIntervalSeconds = 10;
 const tankLevelDistanceReadingSmoothingCoefficient = 0.990;
 const tankLevelDistanceReadingIntervalMilliseconds = 500;
 const tankLevelReportingIntervalSeconds = 10;
-const tankLevelSensorMountHeightCentimeters = 200
+const tankLevelSensorMountHeightCentimeters = 200;
 
 const tankLevelSensor = require("HC-SR04").connect(D25, D34, function(distanceCentimeters) {
     lastTankLevelDistanceReadingRaw = distanceCentimeters;
@@ -53,9 +54,9 @@ function reportTankLevel() {
                        "timestamp_millis": Date.now()};
         if (unsentTankLevelReading) {
             let tankLevelReadingMeters = (tankLevelSensorMountHeightCentimeters - tankLevelDistanceReadingCentimeters) * 0.01;
-            message["last_tank_level_distance_reading_centimeters"] = lastTankLevelDistanceReadingRaw;
-            message["tank_level_meters"] = tankLevelReadingMeters;
-        };
+            message.last_tank_level_distance_reading_centimeters = lastTankLevelDistanceReadingRaw;
+            message.tank_level_meters = tankLevelReadingMeters;
+        }
         writeMessage("update_state", message);
         unsentTankLevelReading = false;
     }
@@ -63,7 +64,7 @@ function reportTankLevel() {
 
 function readBatteryVoltage() {
     let reading = analogRead(D35);
-    let calibratedReading = reading * batteryCalibrationScaleFactor
+    let calibratedReading = applyBatteryVoltageCalibration(reading);
     batteryReading = batteryReading * batteryReadingSmoothingCoefficient + calibratedReading * (1 - batteryReadingSmoothingCoefficient);
 }
 
@@ -74,37 +75,14 @@ function flash() {
     setTimeout(() => digitalWrite(D2,0), 1000);
 }
 
-// Deep sleep after timeout
-// NOTE: This may overide the reboot on wifi non-connection
-console.log("Staying awake for", wakeDurationSeconds, "seconds before going back to deep sleep for", deepSleepDurationSeconds, "seconds");
-let deepSleepTimeout = setTimeout(function (){
-    console.log("Entering deep sleep");
-    if ('globalClient' in global && globalClient !== undefined) {
-        writeMessage("enter_deep_sleep", {"duration_seconds": deepSleepDurationSeconds, "timestamp_millis": Date.now()});
-    }
-    setTimeout(function(){
-        if ('globalClient' in global && globalClient !== undefined) {
-            globalClient.end();
-        }
-        ESP32.deepSleep(deepSleepDurationSeconds * 1000000);
-    }, 100);
-}, wakeDurationSeconds * 1000);
-
 function handleCommand(command, params) {
     if (command == "flash") {
         flash();
     } else if (command == "readTankLevelSensor") {
         reportTankLevel();
-    } else if (command == "stayAwake") {
-        clearTimeout(deepSleepTimeout);
-        if ('globalClient' in global && globalClient !== undefined) {
-            writeMessage("staying_awake", {"timestamp_millis": Date.now()});
-        }
     }
 }
 
-// NOTE: These do **not** wake the mcu from deep sleep, so reporting of empty/full tank
-// level will not always be immediate
 // Report immediately when upper float switch goes up (tank full)
 setWatch(reportTankLevel, D26, { repeat: true, edge: 'rising', debounce: 25 });
 // Report immediately when lower float switch goes down (tank empty)
