@@ -1,13 +1,12 @@
 {
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-22.11";
-    # TODO
-    nix-rebar3.url = "/home/rowan/projects/nix-rebar3";
+    nix-rebar3.url = "github:axelf4/nix-rebar3";
     nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
     spago2nix.url = "github:justinwoo/spago2nix";
     spago2nix.inputs.nixpkgs.follows = "nixpkgs";
     # TODO
-    purerl.url = "/home/rowan/projects/nixpkgs-purerl";
+    purerl.url = "github:rskew/nixpkgs-purerl";
     purerl.inputs.nixpkgs.follows = "nixpkgs";
   };
 
