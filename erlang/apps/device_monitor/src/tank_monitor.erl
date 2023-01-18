@@ -63,8 +63,26 @@ connected(info, {tcp, _Socket, Packet}, Data=#{parser_state := ParserState}) ->
     NewParserState = device_monitor:parse_packet(self(), Packet, ParserState),
     {keep_state, Data#{parser_state => NewParserState}};
 
+connected(cast, {message, Message=[<<"update_state">>, #{<<"battery_voltage">> := BatteryVoltageReading}]}, _Data=#{device_id := DeviceID}) ->
+    %io:format("Received battery reading message from tank_monitor ~p:~n~p~n", [DeviceID, Message]),
+    InfluxdbPort = list_to_integer(os:getenv("AUTOFARM_DEVICE_MONITOR_INFLUXDB_PORT")),
+    post_reading_to_influxdb("http", "localhost", InfluxdbPort, ?MODBIN, "battery_voltage_volts", io_lib:format("~f", [BatteryVoltageReading])),
+    keep_state_and_data;
+
+connected(cast,
+          {message, Message=[<<"update_state">>, #{<<"tank_level_meters">> := TankLevelReading,
+                                                   <<"tank_float_switch_lower">> := LowerFloatSwitchPosition,
+                                                   <<"tank_float_switch_upper">> := UpperFloatSwitchPosition}]},
+          _Data=#{device_id := DeviceID}) ->
+    %io:format("Received tank-level message from tank_monitor ~p:~n~p~n", [DeviceID, Message]),
+    InfluxdbPort = list_to_integer(os:getenv("AUTOFARM_DEVICE_MONITOR_INFLUXDB_PORT")),
+    post_reading_to_influxdb("http", "localhost", InfluxdbPort, ?MODBIN, "tank_level_meters", io_lib:format("~f", [TankLevelReading])),
+    post_reading_to_influxdb("http", "localhost", InfluxdbPort, ?MODBIN, "lower_float_switch_up", if LowerFloatSwitchPosition == <<"down">> -> "0"; true -> "1" end),
+    post_reading_to_influxdb("http", "localhost", InfluxdbPort, ?MODBIN, "upper_float_switch_up", if UpperFloatSwitchPosition == <<"down">> -> "0"; true -> "1" end),
+    keep_state_and_data;
+
 connected(cast, {message, Message}, _Data=#{device_id := DeviceID}) ->
-    io:format("Received message from tank_monitor ~p:~n~p~n", [DeviceID, Message]),
+    io:format("Received unhandled message from tank_monitor ~p:~n~p~n", [DeviceID, Message]),
     keep_state_and_data;
 
 connected(info, {tcp_closed, OldSocket}, Data) ->
@@ -141,3 +159,34 @@ handle_common(_State, cast, {connection, Socket, InitialPacket}, Data=#{connecti
 handle_common(State, Event, EventContent, _Data) ->
     io:format("Unhandled event ~p in state '~p' with content: ~p~n", [Event, State, EventContent]),
     keep_state_and_data.
+
+post_reading_to_influxdb(Scheme, Hostname, Port, DatabaseName, SeriesName, Reading) ->
+    Now = os:system_time(nanosecond),
+    Path = iolist_to_binary([<<"api/v2/write?bucket=">>, DatabaseName]),
+    Message = iolist_to_binary([SeriesName, " value=", Reading, " ", integer_to_list(Now)]),
+    httpPost(Scheme, Hostname, Port, Path, Message).
+
+httpPost(Scheme, Hostname, Port, Path, Message) ->
+    Url = iolist_to_binary([Scheme, <<"://">>, Hostname, <<":">>, integer_to_binary(Port), <<"/">>, Path]),
+    %io:format("sending message ~p~n", [Message]),
+    Blah = spawn(fun() ->
+                         receive {http, {_, {{_, ResponseCode, _}, _, _}}} ->
+                                     true
+                                     %io:format("Received response ~p~n", [ResponseCode])
+                         end
+                 end),
+    case httpc:request(post,
+                       {Url,
+                        [],
+                        "application/octet-stream",
+                        Message},
+                       [],
+                       [{sync, false},
+                        {receiver, Blah}
+                        ])
+    of
+        {ok, _RequestId} ->
+            true;
+        {error, Reason} ->
+            io:format("problem sending http request: ~p~n", [Reason])
+    end.

@@ -15,7 +15,7 @@ initDb() ->
                             ])
         of
           {ok, ?EVENT_SCHEDULE_TABLE_NAME} -> true;
-          {error, ReasonOpen} -> exit(ReasonOpen)
+          {error, ReasonOpen1} -> exit(ReasonOpen1)
         end,
         case dets:open_file(?EVENT_LOG_TABLE_NAME,
                             [{file, EventLogFileName},
@@ -23,7 +23,7 @@ initDb() ->
                             ])
         of
           {ok, ?EVENT_LOG_TABLE_NAME} -> true;
-          {error, ReasonOpen} -> exit(ReasonOpen)
+          {error, ReasonOpen2} -> exit(ReasonOpen2)
         end
     end.
 

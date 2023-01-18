@@ -50,7 +50,7 @@ function readTankLevel() {
 function reportTankLevel() {
     if ('globalClient' in global && globalClient !== undefined) {
         let message = {"tank_float_switch_upper": digitalRead(D26) ? "up" : "down",
-                       "tank_float_switch_lower": digitalRead(D27) ? "down" : "up", // Lower float sensor is wired the wrong way, requires pull up
+                       "tank_float_switch_lower": digitalRead(D27) ? "down" : "up", // Lower float switch is wired up backwards
                        "timestamp_millis": Date.now()};
         if (unsentTankLevelReading) {
             let tankLevelReadingMeters = (tankLevelSensorMountHeightCentimeters - tankLevelDistanceReadingCentimeters) * 0.01;

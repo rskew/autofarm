@@ -17,7 +17,7 @@ init([]) ->
     {ok, #{}}.
 
 listener() ->
-    Port = list_to_integer(os:getenv("AUTOFARM_DEVICE_LISTENER_PORT")),
+    Port = list_to_integer(os:getenv("AUTOFARM_DEVICE_MONITOR_DEVICE_LISTENER_PORT")),
     case gen_tcp:listen(Port, [{active, false}, binary, {keepalive, true}, {reuseaddr, true}, {nodelay, true},
                                 % https://github.com/torvalds/linux/blob/master/include/uapi/linux/tcp.h#L91
                                 %{raw, 6, 18, <<1:64/native>>}, % TCP_USER_TIMEOUT response timeout on send (including keepalives)

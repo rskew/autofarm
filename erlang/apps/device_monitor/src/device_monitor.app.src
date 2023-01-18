@@ -8,6 +8,7 @@
     stdlib,
     gproc
    ]},
+  {inets, [{services, [{httpc, []}]}]},
   {env,[]},
   {modules, []},
 

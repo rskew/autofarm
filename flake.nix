@@ -78,7 +78,7 @@
           spago2nix
         ];
         shellHook = ''
-          cd erlang/apps/purerl_task_scheduler
+          cd erlang/apps/event_scheduler
 
           cat << EOF
           Development build:
@@ -94,7 +94,7 @@
       };
       packages.x86_64-linux.autofarm-purerl =
         let
-          spagoPackages = import ./erlang/apps/purerl_task_scheduler/spago-packages.nix { inherit pkgs; };
+          spagoPackages = import ./erlang/apps/event_scheduler/spago-packages.nix { inherit pkgs; };
           # Customised version of spagoPackages.mkBuildProjectOutput that uses purs to compile .purs to corefn, then runs purerl
           mkBuildProjectOutput = { src, purs }:
             pkgs.stdenv.mkDerivation {
@@ -112,7 +112,7 @@
               '';
             };
           builtPursSources = mkBuildProjectOutput {
-            src = ./erlang/apps/purerl_task_scheduler;
+            src = ./erlang/apps/event_scheduler;
             purs = pkgs.purescript;
           };
         in builtPursSources;
@@ -125,24 +125,66 @@
         }).overrideAttrs (finalAttrs: previousAttrs: {
           preBuildPhases = [ "symlinkPurerl" "symlinkPrivToFrontend" ];
           symlinkPurerl = ''
-            rm apps/purerl_task_scheduler/src/output
-            ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/purerl_task_scheduler/src/output
+            rm apps/event_scheduler/src/output
+            ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/event_scheduler/src/output
           '';
           symlinkPrivToFrontend = ''
             rm apps/frontend_server/priv
             ln -s ${packages.x86_64-linux.frontend} apps/frontend_server/priv
           '';
         });
+      devShells.x86_64-linux.influxdb = pkgs.mkShell {
+        buildInputs = [
+          pkgs.influxdb
+        ];
+        shellHook = ''
+          cat << EOF
+
+          Start influxdb via
+            $ influxd run
+
+          Connect to influx shell via
+            $ influx -username <user> -password '<password>'
+
+          If influxd has just started for the first time, set the user up via
+            $ influx
+            > CREATE USER <user> WITH PASSWORD '<password>' WITH ALL PRIVILEGES
+
+          Query users:
+            > SHOW USERS
+
+          Database management:
+            > SHOW DATABASES
+            > CREATE DATABASE hello
+            > DROP DATABASE hello
+            > DELETE FROM hello
+
+          Query data:
+            > USE hello
+            > SELECT * FROM hello
+
+          Docs:
+            - https://docs.influxdata.com/influxdb/v1.8/query_language/explore-data/
+            - https://docs.influxdata.com/influxdb/v1.8/query_language/spec/
+
+          EOF
+          '';
+      };
+
       nixosModule =
         { lib, config, ... }:
         let
           cfg = config.services.autofarm;
         in {
           options.services.autofarm = {
-            deviceListenerPort = lib.mkOption {
+            deviceMonitorDeviceListenerPort = lib.mkOption {
               type = lib.types.int;
               default = 9222;
               description = "Port for devices to connect on";
+            };
+            deviceMonitorInfluxdbPort = lib.mkOption {
+              type = lib.types.int;
+              default = 8086;
             };
             ecronServerEcrontab = lib.mkOption {
               type = lib.types.path;
@@ -159,7 +201,17 @@
             };
           };
           config = {
-            networking.firewall.allowedTCPPorts = [ cfg.deviceListenerPort cfg.frontendServerPort ];
+            services.influxdb = {
+              enable = true;
+              extraConfig = {
+                http = { bind-address = ":${toString(cfg.deviceMonitorInfluxdbPort)}"; };
+              };
+            };
+            services.grafana = {
+              enable = true;
+              settings = {};
+            };
+            networking.firewall.allowedTCPPorts = [ cfg.deviceMonitorDeviceListenerPort cfg.frontendServerPort ];
             systemd.services.autofarm = {
               description = "";
               after = [ "network-pre.target" ];
@@ -167,7 +219,8 @@
               wantedBy = [ "multi-user.target" ];
               path = [pkgs.gawk];
               environment = {
-                AUTOFARM_DEVICE_LISTENER_PORT = toString(cfg.deviceListenerPort);
+                AUTOFARM_DEVICE_MONITOR_DEVICE_LISTENER_PORT = toString(cfg.deviceMonitorDeviceListenerPort);
+                AUTOFARM_DEVICE_MONITOR_INFLUXDB_PORT = toString(cfg.deviceMonitorInfluxdbPort);
                 AUTOFARM_ECRON_SERVER_ECRONTAB = cfg.ecronServerEcrontab;
                 AUTOFARM_FRONTEND_SERVER_PORT = toString(cfg.frontendServerPort);
                 AUTOFARM_FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = cfg.frontendServerBasicAuthCredentialsFile;
