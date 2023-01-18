@@ -11,8 +11,8 @@ digitalWrite(D5, 0);
 // - battery 13V, reading 3.480 / 11
 // - battery 15V, reading 4.085 / 11
 const applyBatteryVoltageCalibration = function(rawReading) {
-    return rawReading * 36.3 + 1.52
-}
+    return rawReading * 36.3 + 1.52;
+};
 
 // State variables
 let batteryReading = applyBatteryVoltageCalibration(analogRead(D35));
@@ -28,7 +28,7 @@ const batteryReadingReportingIntervalSeconds = 10;
 const tankLevelDistanceReadingSmoothingCoefficient = 0.990;
 const tankLevelDistanceReadingIntervalMilliseconds = 500;
 const tankLevelReportingIntervalSeconds = 10;
-const tankLevelSensorMountHeightCentimeters = 200;
+const tankLevelSensorMountHeightCentimeters = 202;
 
 const tankLevelSensor = require("HC-SR04").connect(D25, D34, function(distanceCentimeters) {
     lastTankLevelDistanceReadingRaw = distanceCentimeters;
@@ -50,7 +50,7 @@ function readTankLevel() {
 function reportTankLevel() {
     if ('globalClient' in global && globalClient !== undefined) {
         let message = {"tank_float_switch_upper": digitalRead(D26) ? "up" : "down",
-                       "tank_float_switch_lower": digitalRead(D27) ? "up" : "down",
+                       "tank_float_switch_lower": digitalRead(D27) ? "down" : "up", // Lower float sensor is wired the wrong way, requires pull up
                        "timestamp_millis": Date.now()};
         if (unsentTankLevelReading) {
             let tankLevelReadingMeters = (tankLevelSensorMountHeightCentimeters - tankLevelDistanceReadingCentimeters) * 0.01;
@@ -86,7 +86,7 @@ function handleCommand(command, params) {
 // Report immediately when upper float switch goes up (tank full)
 setWatch(reportTankLevel, D26, { repeat: true, edge: 'rising', debounce: 25 });
 // Report immediately when lower float switch goes down (tank empty)
-setWatch(reportTankLevel, D27, { repeat: true, edge: 'falling', debounce: 25 });
+setWatch(reportTankLevel, D27, { repeat: true, edge: 'rising', debounce: 25 });
 
 // Read battery voltage, smoothing readings
 setInterval(function() {
