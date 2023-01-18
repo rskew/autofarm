@@ -21,5 +21,5 @@ content_types_provided(Req, State) ->
         {<<"application/json">>, to_json}
     ], Req, State}.
 
-to_json(Req, State=#{user := User, password := Password, ws_url := WsUrl}) ->
-    {jsone:encode(#{ws_url => WsUrl, session_token => << User/binary, ":", Password/binary >>}), Req, State}.
+to_json(Req, State=#{user := User, password := Password, ws_path := WsPath}) ->
+    {jsone:encode(#{wsPath => WsPath, sessionToken => << User/binary, ":", Password/binary >>}), Req, State}.

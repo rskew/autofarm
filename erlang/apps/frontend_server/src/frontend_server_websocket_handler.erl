@@ -16,7 +16,8 @@ websocket_handle({text, <<"Authorization: Bearer ", ClientToken/binary>>}, State
           {close, 1002, <<"Authorization Failed">>}
          ], State}
     end;
-websocket_handle(Frame = {text, _}, State=#{authorized := true}) ->
+websocket_handle(Frame={text, _}, State=#{authorized := true}) ->
+    % echo
     {[Frame], State};
 websocket_handle(_Frame, State) ->
     {[], State}.

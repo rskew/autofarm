@@ -8,8 +8,8 @@ start(_Type, _Args) ->
     {ok, User, Password} = load_basic_auth_credentials(),
     Dispatch = cowboy_router:compile([
         {'_', [
-            {"/authorize", frontend_server_authorization_handler, #{user => User, password => Password, ws_url => <<"ws://localhost:8082/ws">>}},
-            {"/ws", frontend_server_websocket_handler, #{token => << User/binary, ":", Password/binary >>, authorized => false}},
+            {"/authorize", frontend_server_authorization_handler, #{user => User, password => Password, ws_path => <<"/ws">>}},
+            {"/ws", frontend_server_websocket_handler, #{token => <<User/binary, ":", Password/binary>>, authorized => false}},
             {"/", cowboy_static, {priv_file, frontend_server, "index.html"}},
             {"/[...]", cowboy_static, {priv_dir, frontend_server, ""}}
     ]}]),

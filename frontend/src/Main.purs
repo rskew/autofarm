@@ -16,6 +16,7 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Class (liftEffect)
 import Effect.Console as Console
 import Foreign (F, Foreign, unsafeToForeign, readString)
 import Halogen as H
@@ -23,6 +24,9 @@ import Halogen.Aff as HA
 import Halogen.Subscription as HS
 import Halogen.VDom.Driver (runUI)
 import Web.Event.EventTarget as EET
+import Web.HTML as WH
+import Web.HTML.Location as WL
+import Web.HTML.Window as WW
 import Web.Socket.Event.EventTypes as WSET
 import Web.Socket.Event.MessageEvent as ME
 import Web.Socket.WebSocket as WS
@@ -64,7 +68,7 @@ wsSender socket = case _ of
   MainComponent.OutputMessage msgContents ->
     WS.sendString socket msgContents
 
-type ResponseBody = {ws_url :: String, session_token :: String}
+type ResponseBody = {wsPath :: String, sessionToken :: String}
 
 main :: Effect Unit
 main = do
@@ -83,10 +87,11 @@ main = do
       Right authResponse -> do
         body <- HA.awaitBody
         io <- runUI mainComponent unit body
-        connection <- H.liftEffect $ WS.create authResponse.ws_url []
+        wsUrl <- liftEffect $ getWSUrl authResponse.wsPath
+        connection <- H.liftEffect $ WS.create wsUrl []
         H.liftEffect do
           listener <- EET.eventListener \_ ->
-            WS.sendString connection $ "Authorization: Bearer " <> authResponse.session_token
+            WS.sendString connection $ "Authorization: Bearer " <> authResponse.sessionToken
           EET.addEventListener
             WSET.onOpen
             listener
@@ -99,3 +104,11 @@ main = do
         -- Connecting the consumer to the producer initializes both,
         -- feeding queries back to our component as messages are received.
         H.liftAff $ CR.runProcess (wsProducer connection CR.$$ wsConsumer io.query)
+
+getWSUrl :: String -> Effect (String)
+getWSUrl path = do
+  window <- WH.window
+  location <- WW.location window
+  host <- WL.host location
+  protocol <- WL.protocol location
+  pure $ (if protocol == "https:" then "wss://" else "ws://") <> host <> path
