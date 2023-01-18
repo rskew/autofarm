@@ -14,8 +14,8 @@
 % calendar:now_to_datetime(erlang:timestamp()).
 %
 % ecron_server:add_cronjob(water_top_rows, "0 18 * * *", {irrigation_controller, activate_solenoid, [0, 4, 1800]}).
-% ecron_server:add_cronjob(water_tommies, "30 17 * * *", {irrigation_controller, activate_solenoid, [0, 6, 1800]}).
-% ecron_server:add_cronjob(water_cucs_zucs, "0 17 * * *", {irrigation_controller, activate_solenoid, [0, 5, 1800]}).
+% ecron_server:add_cronjob(water_tommies, "30 17 * * *", {irrigation_controller, activate_solenoid, [0, 6, 1200]}).
+% ecron_server:add_cronjob(water_cucs_zucs, "0 17 * * *", {irrigation_controller, activate_solenoid, [0, 5, 2400]}).
 % ecron_server:add_cronjob(water_pumpkins, "30 17 * * *", {irrigation_controller, activate_solenoid, [0, 2, 1800]}).
 % ecron_server:add_cronjob(water_old_poly_tunnel, "30 18 * * *", {irrigation_controller, activate_solenoid, [0, 1, 300]}).
 
