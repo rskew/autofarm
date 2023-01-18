@@ -5,12 +5,13 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..), Seconds(..))
 import Effect (Effect)
-import ExampleGenServer as ExampleGenServer
 import Erl.Atom (atom)
 import Erl.Data.List (nil, (:))
 import Pinto (RegistryName(..), StartLinkResult)
 import Pinto.Supervisor (ChildShutdownTimeoutStrategy(..), ChildType(..), RestartStrategy(..), Strategy(..), SupervisorPid, SupervisorSpec, spec)
 import Pinto.Supervisor as Sup
+
+import EventScheduler as EventScheduler
 
 startLink :: Effect (StartLinkResult SupervisorPid)
 startLink = do
@@ -27,7 +28,7 @@ init = do
     , childSpecs:
         (spec { id: "hello"
               , childType: Worker
-              , start: ExampleGenServer.startLink {}
+              , start: EventScheduler.startLink {}
               , restartStrategy: RestartPermanent
               , shutdownStrategy: ShutdownTimeout $ Milliseconds 5000.0
               })
