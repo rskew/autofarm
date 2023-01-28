@@ -12,6 +12,16 @@
 
   outputs = { self, nixpkgs, nix-rebar3, spago2nix, purerl }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        python-ftdi = pkgs.python3.withPackages (p: [ p.pyftdi ]);
+        # Script to set the three gpio values (active low)
+        # Values for relays 1, 2, 3 and 4 are arguments 1, 2, 3 and 4
+        # Relay 1 is ftdi gpio 0, relay 2 is ftdi gpio 3, relay 3 is ftdi gpio 1, relay 4 is ftdi gpio 4
+        # Call from erlang via:
+        #   os:cmd(io_lib:format("bang ~B ~B ~B ~B", [0, 0, 0, 0])).
+        bang = pkgs.writeShellScriptBin "bang" ''
+          let "bits = 255 - $1 - $2 * 8 - $3 * 2 - $4 * 16"
+          ${python-ftdi}/bin/python ${./devices/irrigation_controller_ftdi_gpio/set-gpio.py} $bits
+        '';
     in rec {
 
       devShells.x86_64-linux.mcu = pkgs.mkShell {
@@ -56,7 +66,8 @@
           pkgs.erlang
           pkgs.rebar3
         ];
-        AUTOFARM_DEVICE_LISTENER_PORT = 9222;
+        bang = "${bang}/bin/bang";
+        AUTOFARM_DEVICE_MONITOR_DEVICE_LISTENER_PORT = 9222;
         AUTOFARM_ECRON_SERVER_ECRONTAB = "ecrontab";
         AUTOFARM_FRONTEND_SERVER_PORT = 8082;
         AUTOFARM_FRONTEND_SERVER_BASIC_AUTH_CREDENTIALS_FILE = "frontend-server-basic-auth-credentials";
@@ -75,7 +86,7 @@
           pkgs.spago
           pkgs.purescript
           purerl.packages.x86_64-linux.purerl-0-0-18
-          spago2nix
+          spago2nix.packages.x86_64-linux.spago2nix
         ];
         shellHook = ''
           cd erlang/apps/event_scheduler
@@ -123,7 +134,10 @@
           version = "0.1.0";
           releaseType = "release";
         }).overrideAttrs (finalAttrs: previousAttrs: {
-          preBuildPhases = [ "symlinkPurerl" "symlinkPrivToFrontend" ];
+          preBuildPhases = [ "linkBangScript" "symlinkPurerl" "symlinkPrivToFrontend" ];
+          linkBangScript = ''
+            substituteInPlace apps/device_monitor/src/irrigation_controller.erl --replace "\$bang" "${bang}/bin/bang"
+          '';
           symlinkPurerl = ''
             rm apps/event_scheduler/src/output
             ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/event_scheduler/src/output

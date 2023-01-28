@@ -32,11 +32,10 @@ data EventError
 type EventId = String
 
 type EventSchedule
-  = { name :: String
-    , action :: EventId -> Effect Unit
+  = { action :: EventId -> Effect Unit
     , runAfter :: Time
     , runBefore :: Time
-    , timeoutSeconds :: Int
+    , timeoutFromConfirmedStartSeconds :: Int
     , errorHandler :: EventError -> Effect Unit
     , everyDays :: Int
     }
@@ -49,20 +48,37 @@ data EventState
 -- API
 -- ===================================================================
 
-updateSchedule :: EventSchedule -> Effect Unit
-updateSchedule schedule = GenServer.cast (ByName serverName) \state -> do
-  -- TODO run event-check then record schedule change in log
-  liftEffect $ updateScheduleImpl schedule
+updateSchedule :: String -> Maybe EventSchedule -> Effect Unit
+updateSchedule key maybeSchedule = GenServer.cast (ByName serverName) \state -> do
+  case maybeSchedule of
+    Nothing -> liftEffect $ removeScheduleImpl key
+    Just schedule -> do
+      -- TODO run event-check then record schedule change in log
+      liftEffect $ updateScheduleImpl key schedule
   pure $ GenServer.return state
 
 -- TODO
---reportEventState :: EventId -> EventState -> Effect Unit
---removeSchedule :: String -> Effect Unit
---querySchedule :: Effect (Array EventSchedule)
+--updateEventState :: EventId -> EventState -> Effect Unit
+--querySchedule :: String -> Effect (Maybe EventSchedule)
+--queryAllSchedules :: Effect (Array EventSchedule)
 --queryComingEventsWithin :: String -> Duration -> Effect (Array DateTime)
 --queryComingEventsCount :: String -> Int -> Effect (Array DateTime)
 --queryHistoricalEventsWithin :: String -> Duration -> Effect (Array DateTime)
 --queryHistoricalEventsCount :: String -> Int -> Effect (Array DateTime)
+
+-- ===================================================================
+-- Internal API
+-- ===================================================================
+
+-- | Check an event schedule for current events that don't have corresponding logs.
+-- | If a current event has no corresponding log, then action the event and create the log.
+eventCheck :: String -> Effect Unit
+-- TODO
+eventCheck _ = pure unit
+
+--createEventLog :: String -> DateTime -> EventState -> Effect Unit
+---- TODO
+--createEventLog _ _ _ = pure unit
 
 -- ===================================================================
 -- CallBacks
@@ -92,7 +108,9 @@ serverName = Local $ atom "event_scheduler"
 
 foreign import initDb :: Effect Unit
 
-foreign import updateScheduleImpl :: EventSchedule -> Effect Unit
+foreign import updateScheduleImpl :: String -> EventSchedule -> Effect Unit
+
+foreign import removeScheduleImpl :: String -> Effect Unit
 
 -- TODO
 -- eventCheck

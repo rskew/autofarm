@@ -1,6 +1,6 @@
 -module(eventScheduler@foreign).
 
--export([initDb/0, updateScheduleImpl/1]).
+-export([initDb/0, updateScheduleImpl/2, removeScheduleImpl/1]).
 
 -define(EVENT_SCHEDULE_TABLE_NAME, eventSchedule).
 -define(EVENT_LOG_TABLE_NAME, eventLog).
@@ -27,11 +27,18 @@ initDb() ->
         end
     end.
 
-updateScheduleImpl(EventSchedule=#{name := Name,
-                                   action := Action,
-                                   runAfter := RunAfter,
-                                   runBefore := RunBefore,
-                                   timeoutSeconds := TimeoutSeconds,
-                                   errorHandler := ErrorHandler,
-                                   everyDays := EveryDays}) ->
-  dets:insert(?EVENT_SCHEDULE_TABLE_NAME, {Name, EventSchedule}).
+updateScheduleImpl(Key,
+                   EventSchedule=#{action := _Action,
+                                   runAfter := _RunAfter,
+                                   runBefore := _RunBefore,
+                                   timeoutSeconds := _TimeoutSeconds,
+                                   errorHandler := _ErrorHandler,
+                                   everyDays := _EveryDays}) ->
+    fun() ->
+        dets:insert(?EVENT_SCHEDULE_TABLE_NAME, {Key, EventSchedule})
+    end.
+
+removeScheduleImpl(Key) ->
+    fun() ->
+        dets:delete(?EVENT_SCHEDULE_TABLE_NAME, Key)
+    end.

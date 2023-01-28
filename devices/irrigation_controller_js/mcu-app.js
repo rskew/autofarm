@@ -20,9 +20,9 @@ solenoids = {
     1: {"pin": D23, "on": 1, "off": 0, "timeout": null},
     2: {"pin": D22, "on": 1, "off": 0, "timeout": null},
     //3: {"pin": D17, "on": 1, "off": 0, "timeout": null}, // Relay 3 is borked :(
-    4: {"pin": D19, "on": 1, "off": 0, "timeout": null}, // Labelled "5" in the box :(
-    5: {"pin": D18, "on": 0, "off": 1, "timeout": null}, // Labelled "3" in th box
-    6: {"pin": D5,  "on": 0, "off": 1, "timeout": null},
+    4: {"pin": D19, "on": 1, "off": 0, "timeout": null},
+    5: {"pin": D18, "on": 0, "off": 1, "timeout": null},
+    6: {"pin": D5,  "on": 1, "off": 0, "timeout": null},
 };
 
 // Turn off all solenoids on boot

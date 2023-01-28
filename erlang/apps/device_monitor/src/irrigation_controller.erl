@@ -1,135 +1,75 @@
 -module(irrigation_controller).
 
--behaviour(gen_statem).
+-behaviour(gen_server).
 
--export([reboot_device/1, write_file_to_device/3, copy_file_on_device/3, delete_file_on_device/2,
-         flash_lights/1, activate_solenoid/3]).
+-export([set_relay/2, set_relay_on_for/2]).
 
--export([start_link/1, init/1, callback_mode/0, terminate/3]).
--export([waiting/3, connected/3]).
-
--define(MODBIN, <<"irrigation_controller">>).
+-export([start_link/0, init/1, handle_info/2, handle_cast/2, handle_call/3]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-flash_lights(DeviceID) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, flash_lights).
+set_relay(RelayID, RelayState) ->
+    erlang:send(?MODULE, {set_relay, RelayID, RelayState}).
 
-reboot_device(DeviceID) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, reboot_device).
-
-activate_solenoid(DeviceID, SolenoidId, DurationSeconds) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {activate_solenoid, SolenoidId, DurationSeconds}).
-
-write_file_to_device(DeviceID, LocalFileName, DeviceFileName) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {write_file, LocalFileName, DeviceFileName}).
-
-copy_file_on_device(DeviceID, CopyFromFileName, CopyToFileName) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {copy_file, CopyFromFileName, CopyToFileName}).
-
-delete_file_on_device(DeviceID, FileName) ->
-    gen_statem:cast({via, gproc, {n, l, {?MODBIN, DeviceID}}}, {delete_file, FileName}).
+set_relay_on_for(RelayID, DurationSeconds) ->
+    gen_server:cast(?MODULE, {set_relay_on_for, RelayID, DurationSeconds}).
 
 %%%===================================================================
 %%% CallBack
 %%%===================================================================
 
-start_link(ID) ->
-    gen_statem:start_link({via, gproc, {n, l, {?MODBIN, ID}}}, ?MODULE, ID, []).
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-callback_mode() ->
-    [state_functions, state_enter].
+init([]) ->
+    Data = #{1 => 0, 2 => 0, 3 => 0, 4 => 0},
+    bang(Data),
+    {ok, Data}.
 
-init(ID) ->
-    {ok, waiting, #{device_id => ID, connection => false}}.
+handle_info({set_relay, RelayID, RelayState}, Data) ->
+    UpdatedData = Data#{RelayID => RelayState},
+    io:format("Setting relay ~p to ~p~n", [RelayID, RelayState]),
+    bang(UpdatedData),
+    {noreply, UpdatedData};
 
-terminate(Reason, _State, #{connection := Socket}) ->
-    gen_tcp:close(Socket),
-    io:format("Termination: ~p~n", [Reason]).
+% If ActionRef is supplied, it must match the recorded values in the process state.
+% This enables setting actions to happen later that can be overriden by newer actions,
+% e.g. if a relay is scheduled to turn off via `time:send_after`, then if that relay is re-scheduled,
+% the older off action won't have any effect because the ActionRef in the state will have changed.
+handle_info({set_relay, RelayID, RelayState, ActionRef}, Data) ->
+    #{{action, RelayID} := StateActionRef} = Data,
+    if StateActionRef == ActionRef ->
+            UpdatedData = Data#{RelayID => RelayState},
+            io:format("Setting relay ~p to ~p~n", [RelayID, RelayState]),
+            bang(UpdatedData),
+            {noreply, UpdatedData};
+        true ->
+            {noreply, Data}
+    end;
 
-%%%===================================================================
-%%% State Handlers
-%%%===================================================================
+handle_info(Message, Data) ->
+    io:format("Unhandled info: ~p~n", Message),
+    {noreply, Data}.
 
-connected(enter, _OldState, _Data) ->
-    keep_state_and_data;
+handle_cast({set_relay_on_for, RelayID, DurationSeconds}, Data) ->
+    ActionRef = rand:bytes(32),
+    timer:send_after(DurationSeconds * 1000, {set_relay, RelayID, 0, ActionRef}),
+    erlang:send(?MODULE, {set_relay, RelayID, 1}),
+    {noreply, Data#{{action, RelayID} => ActionRef}};
 
-connected(info, {tcp, _Socket, Packet}, Data=#{parser_state := ParserState}) ->
-    NewParserState = device_monitor:parse_packet(self(), Packet, ParserState),
-    {keep_state, Data#{parser_state => NewParserState}};
+handle_cast(Message, Data) ->
+    io:format("Unhandled cast: ~p~n", Message),
+    {noreply, Data}.
 
-connected(cast, {message, Message}, _Data=#{device_id := DeviceID}) ->
-    io:format("Received message from irrigation_controller ~p:~n~p~n", [DeviceID, Message]),
-    keep_state_and_data;
-
-connected(info, {tcp_closed, OldSocket}, Data) ->
-    io:format("Connection closed ~p~n", [OldSocket]),
-    {next_state, waiting, Data};
-
-connected(info, {tcp_error, OldSocket, etimedout}, _Data) ->
-    io:format("Connection timeout ~p~n", [OldSocket]),
-    keep_state_and_data;
-
-connected(cast, reboot_device, #{connection := Socket}) ->
-    io:format("Sending reboot command~n"),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"reboot">>, #{})),
-    keep_state_and_data;
-
-connected(cast, {write_file, LocalFileName, DeviceFileName}, #{connection := Socket}) ->
-    case file:read_file(LocalFileName) of
-        {ok, Content} ->
-            io:format("Writing file ~p to device file ~p with digest ~p~n", [LocalFileName, DeviceFileName, lists:sum(binary_to_list(Content))]),
-            gen_tcp:send(Socket, [device_monitor:format_command(<<"writeFile">>, #{<<"fileName">> => DeviceFileName, <<"fileLength">> => byte_size(Content)}),
-                                  device_monitor:format_raw_message(Content)]);
-        {error, Reason} ->
-            io:format("Could not read application file: ~p~n", [Reason])
-    end,
-    keep_state_and_data;
-
-connected(cast, {copy_file, CopyFromFileName, CopyToFileName}, #{connection := Socket}) ->
-    io:format("Copying file on device from ~p to ~p~n", [CopyFromFileName, CopyToFileName]),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"copyFile">>, #{<<"copyFromFileName">> => CopyFromFileName, <<"copyToFileName">> => CopyToFileName})),
-    keep_state_and_data;
-
-connected(cast, {delete_file, FileName}, #{connection := Socket}) ->
-    io:format("Deleting file on device ~p~n", [FileName]),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"deleteFile">>, #{<<"fileName">> => FileName})),
-    keep_state_and_data;
-
-connected(cast, flash_lights, #{connection := Socket}) ->
-    io:format("Sending flash-lights command~n"),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"flash">>, #{})),
-    keep_state_and_data;
-
-connected(cast, {activate_solenoid, SolenoidId, DurationSeconds}, #{connection := Socket}) ->
-    io:format("Sending command to activate solenoid ~p for ~p seconds~n", [SolenoidId, DurationSeconds]),
-    gen_tcp:send(Socket, device_monitor:format_command(<<"activateSolenoid">>, #{<<"solenoidID">> => SolenoidId, <<"durationSeconds">> => DurationSeconds})),
-    keep_state_and_data;
-
-connected(Event, EventContent, Data) -> handle_common(connected, Event, EventContent, Data).
-
-waiting(enter, _OldState, _Data) ->
-    keep_state_and_data;
-
-waiting(Event, EventContent, Data) -> handle_common(waiting, Event, EventContent, Data).
+handle_call(Message, _From, Data) ->
+    io:format("Unhandled call: ~p~n", Message),
+    {noreply, Data}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-handle_common(_State, cast, {connection, Socket, InitialPacket}, Data=#{connection := OldSocket}) ->
-    io:format("New connection ~p~n", [Socket]),
-    if OldSocket =/= false ->
-           io:format("Closing old connection ~p~n", [OldSocket]),
-           gen_tcp:close(OldSocket);
-       true -> true
-    end,
-    inet:setopts(Socket, [{active, true}]),
-    {next_state, connected, Data#{connection => Socket, parser_state => device_monitor:empty_parser_state()},
-     [{next_event, info, {tcp, Socket, InitialPacket}}]};
-
-handle_common(State, Event, EventContent, _Data) ->
-    io:format("Unhandled event ~p in state '~p' with content: ~p~n", [Event, State, EventContent]),
-    keep_state_and_data.
+bang(#{1 := Relay1State, 2 := Relay2State, 3 := Relay3State, 4 := Relay4State}) ->
+    os:cmd(io_lib:format("$bang ~B ~B ~B ~B", [Relay1State, Relay2State, Relay3State, Relay4State])).
