@@ -250,11 +250,8 @@
             };
           };
         };
-      apps.x86_64-linux.autofarm-remsh =
-        let program = pkgs.writeShellScriptBin "autofarm-remsh" ''
-              ${packages.x86_64-linux.autofarm}/bin/autofarm remote_console
-            '';
-        in { type = "app"; program = "${program}/bin/autofarm-remsh"; };
+      packages.x86_64-linux.autofarm-remsh = pkgs.writeShellScriptBin "autofarm-remsh"
+        "${packages.x86_64-linux.autofarm}/bin/autofarm remote_console";
 
       devShells.x86_64-linux.frontend = pkgs.mkShell {
         buildInputs = [
@@ -360,6 +357,114 @@
         shellHook = ''
           cd devices/test_ota_update
           npm run
+        '';
+      };
+
+      packages.x86_64-linux.postgresWrapperDev =
+        let hbaFile = pkgs.writeText "pg_hba.conf" ''
+              host all all 0.0.0.0/0 md5
+              host all all ::0/0     md5
+            '';
+        in pkgs.writeShellApplication {
+             name = "postgres-wrapper";
+             runtimeInputs = [ (pkgs.postgresql.withPackages (p: [ p.postgis ])) ];
+             text = ''
+               # For some reason zellij sends SIGHUP to commands on exit,
+               # which isn't a strong-enough signal to stop postgres
+               stop_postgres() {
+                 echo Received exit signal, stopping postgres
+                 kill -INT "$postgres_pid"
+               }
+               trap stop_postgres SIGHUP SIGINT SIGTERM
+               # Run postgres listening for TCP connections
+               postgres -c unix_socket_directories= -c hba_file=${hbaFile} &
+               postgres_pid=$!
+               echo postgres_pid: "$postgres_pid"
+               wait
+             '';
+           };
+
+      devShells.x86_64-linux.db = pkgs.mkShell {
+        buildInputs = [
+          pkgs.pgcli
+          pkgs.postgresql
+          pkgs.postgresqlPackages.postgis
+          packages.x86_64-linux.postgresWrapperDev
+          (pkgs.writeShellApplication {
+            name = "initialize-db";
+            runtimeInputs = [ packages.x86_64-linux.postgresWrapperDev ];
+            text = ''
+              mkdir .db-data
+              echo "$PGPASSWORD" > pwfile
+              initdb --user "$PGUSER" --pwfile=./pwfile
+              rm pwfile
+              postgres-wrapper &
+              postgres_pid=$!
+              for i in 1 2 3; do # wait for the database to start
+                if psql -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS postgis_raster;" > /dev/null;
+                  then
+                    echo Successfully initializing database
+                    break
+                  else sleep 1;
+                fi
+                if [[ "$i" = 3 ]];
+                  then
+                    echo "Failed to initialize database"
+                    exit 1
+                  else
+                    echo "Retrying..."
+                fi
+              done
+              kill -TERM "$postgres_pid"
+              wait
+            '';
+          })
+        ];
+        PGDATA = ".db-data";
+        PGPORT = 5452;
+        PGHOST = "localhost";
+        PGDATABASE = "postgres";
+        PGUSER = "postgres";
+        PGPASSWORD = "fdsa";
+        shellHook = ''
+          cd db
+
+          cat << EOF
+          Run dev DB:
+            postgres-wrapper
+
+          DB console:
+            pgcli
+
+          Ingest raster into postgis:
+            raster2pgsql -t 50x50 -d -C -I -M -l 2,4,8,16,32,64,128,256 farm_dem.tif public.vicmap_dem | psql
+
+          Initialize dev DB:
+            initialize-db
+          EOF
+        '';
+      };
+
+      devShells.x86_64-linux.db-prod = pkgs.mkShell {
+        buildInputs = [
+          pkgs.pgcli
+          pkgs.postgresql
+          pkgs.postgresqlPackages.postgis
+        ];
+        PGPORT = 5432;
+        PGHOST = "objectionable.farm";
+        PGDATABASE = "postgres";
+        PGUSER = "postgres";
+        shellHook = ''
+          cd db
+
+          cat << EOF
+          Prod DB console:
+            PGPASSWORD=****** pgcli
+
+          Ingest raster into prod postgis:
+            raster2pgsql -t 50x50 -d -C -I -M -l 2,4,8,16,32,64,128,256 farm_dem.tif public.vicmap_dem | PGPASSWORD=********* psql
+          EOF
         '';
       };
     };

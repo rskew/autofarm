@@ -1,0 +1,50 @@
+#+title: Spatial
+
+#+PROPERTY: header-args:sql :engine postgresql
+#+PROPERTY: header-args :cache no :exports both :tangle no
+
+# Ingest elevation raster into postgis
+raster2pgsql -t 50x50 -d -C -I -M -l 2,4,8,16,32,64,128,256 farm_dem.tif public.vicmap_dem | psql
+
+#+begin_src sql
+----------------------------------------------------------------------
+---- Create contour lines from elevation raster
+----------------------------------------------------------------------
+begin;
+
+drop table if exists contours_20m;
+create table contours_20m (id serial primary key, height_m double precision, geom geometry(LineString, 7899));
+insert into contours_20m(height_m, geom)
+SELECT value as height_m, geom
+FROM (SELECT (ST_Contour(rast, 1, 20, 0)).*
+      FROM vicmap_dem) t;
+CREATE INDEX sidx_contours_20m
+  ON contours_20m
+  USING GIST (geom);
+
+drop table if exists contours_3m;
+create table contours_3m (id serial primary key, height_m double precision, geom geometry(LineString, 7899));
+insert into contours_3m(height_m, geom)
+SELECT value as height_m, geom
+FROM (SELECT (ST_Contour(rast, 1, 3, 0)).*
+      FROM vicmap_dem) t;
+CREATE INDEX sidx_contours_3m
+  ON contours_3m
+  USING GIST (geom);
+
+drop table if exists contours_1m;
+create table contours_1m (id serial primary key, height_m double precision, geom geometry(LineString, 7899));
+insert into contours_1m(height_m, geom)
+SELECT value as height_m, geom
+FROM (SELECT (ST_Contour(rast, 1, 1, 0)).*
+      FROM vicmap_dem) t;
+CREATE INDEX sidx_contours_1m
+  ON contours_1m
+  USING GIST (geom);
+
+commit;
+
+VACUUM (FULL) contours_20m;
+VACUUM (FULL) contours_3m;
+VACUUM (FULL) contours_1m;
+#+end_src
