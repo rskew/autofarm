@@ -488,7 +488,7 @@
           pkgs.postgresqlPackages.postgis
         ];
         PGPORT = 5432;
-        PGHOST = "objectionable.farm";
+        PGHOST = "45.124.54.206";
         PGDATABASE = "postgres";
         PGUSER = "postgres";
         shellHook = ''
@@ -497,11 +497,17 @@
           cat << EOF
           Prod DB console:
             PGPASSWORD=****** pgcli
-
-          Ingest raster into prod postgis:
-            raster2pgsql -t 50x50 -d -C -I -M -l 2,4,8,16,32,64,128,256 farm_dem.tif public.vicmap_dem | PGPASSWORD=********* psql
           EOF
         '';
+      };
+
+      devShells.x86_64-linux.haskell-get-bin-from-postgres = pkgs.mkShell {
+         packages = [
+           (pkgs.haskellPackages.ghcWithPackages (p: [
+             p.postgresql-simple
+             p.bytestring
+           ]))
+         ];
       };
     };
 }
