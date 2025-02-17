@@ -21,13 +21,13 @@ import Simple.JSON (writeJSON)
 
 data State
   = InitialState
-  | ReceivingState ReceivingState
-  | ReceivingPauseState ReceivingState
-  | DeepSleepingState DeepSleepingState
+  | ReceivingState ReceivingStateData
+  | ReceivingPauseState ReceivingStateData
+  | DeepSleepingState DeepSleepingStateData
 
-type ReceivingState = { socket :: Socket, timeLastSendBatteryVoltage :: Milliseconds }
+type ReceivingStateData = { socket :: Socket, timeLastSendBatteryVoltage :: Milliseconds }
 
-type DeepSleepingState = { socket :: Maybe Socket }
+type DeepSleepingStateData = { socket :: Maybe Socket }
 
 type ConnectionConfig
   = { timeout :: Milliseconds
@@ -45,13 +45,13 @@ type Config
     }
 
 data SocketMessage
-  = SocketMessageStoreFile String Int
-  | SocketMessageReboot
-  | SocketMessageReadSensor
+  = SocketMessageReadSensor
   | SocketMessageReadBatteryVoltage
   | SocketMessageFlashLights
   | SocketMessageDoThingA
   | SocketMessageDoThingB
+  | SocketMessageStoreFile String Int
+  | SocketMessageReboot
 
 derive instance Generic SocketMessage _
 instance Show SocketMessage where
@@ -154,38 +154,38 @@ flashLights = liftF $ FlashLights unit
 program :: Config -> (State -> StateLang State)
 program config =
   let
-    handleSystemMessage :: ReceivingState -> SystemMessage -> StateLang State
+    handleSystemMessage :: ReceivingStateData -> SystemMessage -> StateLang State
     handleSystemMessage _ SystemMessageSocketClosed = pure $ DeepSleepingState {socket: Nothing}
-    handleSystemMessage state (SystemMessageAction action) = do
+    handleSystemMessage stateData (SystemMessageAction action) = do
       liftF action
-      pure $ ReceivingState state
+      pure $ ReceivingState stateData
 
-    handleSocketMessage :: ReceivingState -> SocketMessage -> StateLang State
-    handleSocketMessage state (SocketMessageStoreFile name size) = do
+    handleSocketMessage :: ReceivingStateData -> SocketMessage -> StateLang State
+    handleSocketMessage stateData (SocketMessageStoreFile name size) = do
       storeFile name size
-      pure $ ReceivingState state
+      pure $ ReceivingState stateData
     handleSocketMessage _ SocketMessageReboot = do
       deepSleep $ Milliseconds 0.0
       pure InitialState
-    handleSocketMessage state SocketMessageReadSensor = do
+    handleSocketMessage stateData SocketMessageReadSensor = do
       readSensor >>= case _ of
         Nothing -> pure unit
         Just sensorReading -> sendSocketMessage state.socket $ writeJSON {sensorReading: sensorReading}
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageReadBatteryVoltage = do
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageReadBatteryVoltage = do
       readBatteryVoltage >>= case _ of
         Nothing -> pure unit
-        Just voltage -> sendSocketMessage state.socket $ writeJSON {batteryVoltage: voltage}
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageFlashLights = do
+        Just voltage -> sendSocketMessage stateData.socket $ writeJSON {batteryVoltage: voltage}
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageFlashLights = do
       flashLights
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageDoThingA = do
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageDoThingA = do
       doThingA
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageDoThingB = do
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageDoThingB = do
       doThingB
-      pure $ ReceivingState state
+      pure $ ReceivingState stateData
   in
     case _ of
       InitialState ->
@@ -196,25 +196,25 @@ program config =
               connect config.connectionConfig >>= case _ of
                 Nothing -> pure $ DeepSleepingState {socket: Nothing}
                 Just socket -> pure $ ReceivingState { timeLastSendBatteryVoltage: Milliseconds 0.0, socket : socket }
-      ReceivingState state -> do
-        fromMaybe (pure $ ReceivingPauseState state) =<< (runMaybeT $
-          (MaybeT $ receiveSystemMessage <#> map (handleSystemMessage state))
+      ReceivingState stateData -> do
+        fromMaybe (pure $ ReceivingPauseState stateData) =<< (runMaybeT $
+          (MaybeT $ receiveSystemMessage <#> map (handleSystemMessage stateData))
           <|>
-          (MaybeT $ receiveSocketMessage state.socket <#> map (handleSocketMessage state))
+          (MaybeT $ receiveSocketMessage stateData.socket <#> map (handleSocketMessage stateData))
           <|>
           (MaybeT $ readBatteryVoltage <#> map \batteryVoltage -> do
              nowMillis <- now
-             if nowMillis > state.timeLastSendBatteryVoltage <> config.batteryVoltageSendPeriod
-               then sendSocketMessage state.socket $ writeJSON {batteryVoltage: batteryVoltage}
+             if nowMillis > stateData.timeLastSendBatteryVoltage <> config.batteryVoltageSendPeriod
+               then sendSocketMessage stateData.socket $ writeJSON {batteryVoltage: batteryVoltage}
                else pure unit
              if batteryVoltage < 3.3
-               then pure $ DeepSleepingState {socket: Just state.socket}
-               else pure $ ReceivingPauseState $ state {timeLastSendBatteryVoltage = nowMillis}))
+               then pure $ DeepSleepingState {socket: Just stateData.socket}
+               else pure $ ReceivingPauseState $ stateData {timeLastSendBatteryVoltage = nowMillis}))
       ReceivingPauseState state -> do
         sleep config.loopSleepPeriod
-        pure $ ReceivingState state
-      DeepSleepingState state -> do
-        case state.socket of
+        pure $ ReceivingState stateData
+      DeepSleepingState stateData -> do
+        case stateData.socket of
           Nothing -> pure unit
           Just socket -> closeConnection socket
         deepSleep config.deepSleepPeriod
@@ -271,7 +271,7 @@ interpretPrinty (ReadBatteryVoltage k) = do
   pure (k reading)
 interpretPrinty (Connect _ k) = do
   socket <- liftEffect $ randomInt 0 4 <#> \r -> if r == 0 then Nothing else Just dummySocket
-  liftEffect $ Console.log $ "connecting created: " <> show (isJust socket)
+  liftEffect $ Console.log $ "connection created: " <> show (isJust socket)
   pure (k socket)
 interpretPrinty (CloseConnection _ a) = do
   liftEffect $ Console.log "close connection"
@@ -436,34 +436,34 @@ systemReceiveImpl' = systemReceiveImplJs2 Just Nothing
 program' :: Config -> DeviceActions -> (State -> Laff State)
 program' config actions =
   let
-    handleSystemMessage :: ReceivingState -> SystemMessage' -> Laff State
+    handleSystemMessage :: ReceivingStateData -> SystemMessage' -> Laff State
     handleSystemMessage _ SystemMessageSocketClosed' = pure $ DeepSleepingState {socket: Nothing}
-    handleSystemMessage state (SystemMessageAction' action) = do
+    handleSystemMessage stateData (SystemMessageAction' action) = do
       action
-      pure $ ReceivingState state
+      pure $ ReceivingState stateData
 
-    handleSocketMessage :: ReceivingState -> SocketMessage -> Laff State
-    handleSocketMessage state (SocketMessageStoreFile name size) = do
+    handleSocketMessage :: ReceivingStateData -> SocketMessage -> Laff State
+    handleSocketMessage stateData (SocketMessageStoreFile name size) = do
       --actions.storeFile name size
-      pure $ ReceivingState state
+      pure $ ReceivingState stateData
     handleSocketMessage _ SocketMessageReboot = do
       actions.deepSleep $ Milliseconds 0.0
       pure InitialState
-    handleSocketMessage state SocketMessageReadSensor = do
+    handleSocketMessage stateData SocketMessageReadSensor = do
       actions.readSensor >>= case _ of
         Nothing -> pure unit
-        Just sensorReading -> actions.sendSocketMessage state.socket $ writeJSON {sensor_reading: sensorReading}
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageReadBatteryVoltage = do
+        Just sensorReading -> actions.sendSocketMessage stateData.socket $ writeJSON {sensor_reading: sensorReading}
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageReadBatteryVoltage = do
       actions.readBatteryVoltage >>= case _ of
         Nothing -> pure unit
-        Just voltage -> actions.sendSocketMessage state.socket $ writeJSON {battery_voltage: voltage}
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageFlashLights = do
+        Just voltage -> actions.sendSocketMessage stateData.socket $ writeJSON {battery_voltage: voltage}
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageFlashLights = do
       actions.flashLights
-      pure $ ReceivingState state
-    handleSocketMessage state SocketMessageDoThingA = pure $ ReceivingState state
-    handleSocketMessage state SocketMessageDoThingB = pure $ ReceivingState state
+      pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageDoThingA = pure $ ReceivingState stateData
+    handleSocketMessage stateData SocketMessageDoThingB = pure $ ReceivingState stateData
   in
     case _ of
       InitialState ->
@@ -474,27 +474,27 @@ program' config actions =
               actions.connect config.connectionConfig >>= case _ of
                 Nothing -> pure $ DeepSleepingState {socket: Nothing}
                 Just socket -> pure $ ReceivingState { timeLastSendBatteryVoltage: Milliseconds 0.0, socket: socket }
-      ReceivingState state -> do
-        fromMaybe (pure $ ReceivingPauseState state) =<< (runMaybeT $
-          (MaybeT $ actions.receiveSystemMessage <#> map (handleSystemMessage state))
+      ReceivingState stateData -> do
+        fromMaybe (pure $ ReceivingPauseState stateData) =<< (runMaybeT $
+          (MaybeT $ actions.receiveSystemMessage <#> map (handleSystemMessage stateData))
           <|>
-          (MaybeT $ actions.receiveSocketMessage state.socket <#> map (handleSocketMessage state))
+          (MaybeT $ actions.receiveSocketMessage stateData.socket <#> map (handleSocketMessage stateData))
           <|>
           (MaybeT $ actions.readBatteryVoltage <#> map \batteryVoltage -> do
              nowMillis <- actions.now
-             if nowMillis > state.timeLastSendBatteryVoltage <> config.batteryVoltageSendPeriod
+             if nowMillis > stateData.timeLastSendBatteryVoltage <> config.batteryVoltageSendPeriod
                then do
                  liftEffect $ Console.log "Write battery voltage to socket"
-                 actions.sendSocketMessage state.socket $ writeJSON {battery_voltage: batteryVoltage}
+                 actions.sendSocketMessage stateData.socket $ writeJSON {battery_voltage: batteryVoltage}
                else pure unit
              if batteryVoltage < 3.3
-               then pure $ DeepSleepingState {socket: Just state.socket}
-               else pure $ ReceivingPauseState $ state {timeLastSendBatteryVoltage = nowMillis}))
-      ReceivingPauseState state -> do
+               then pure $ DeepSleepingState {socket: Just stateData.socket}
+               else pure $ ReceivingPauseState $ stateData {timeLastSendBatteryVoltage = nowMillis}))
+      ReceivingPauseState stateData -> do
         actions.sleep config.loopSleepPeriod
-        pure $ ReceivingState state
-      DeepSleepingState state -> do
-        case state.socket of
+        pure $ ReceivingState stateData
+      DeepSleepingState stateData -> do
+        case stateData.socket of
           Nothing -> pure unit
           Just socket -> actions.closeConnection socket
         actions.deepSleep config.deepSleepPeriod

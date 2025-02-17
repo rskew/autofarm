@@ -13,10 +13,15 @@
 % ecron_server:delete_cronjob(hello).
 % calendar:now_to_datetime(erlang:timestamp()).
 %
-% ecron_server:add_cronjob(water_tommies_and_toprow, "30 16 * * *", {irrigation_controller, set_relay_on_for, [1, 1800]}).
-% ecron_server:add_cronjob(water_cuczucs, "30 16 * * *", {irrigation_controller, set_relay_on_for, [2, 1800]}).
-% ecron_server:add_cronjob(water_upper_pumpkins, "0 17 * * *", {irrigation_controller, set_relay_on_for, [3, 1800]}).
-% ecron_server:add_cronjob(water_old_poly_tunnel, "30 17 * * *", {irrigation_controller, set_relay_on_for, [4, 600]}).
+% Old watering schedule
+% %%%ecron_server:add_cronjob(water_tommies_and_toprow, "00 15 * * *", {irrigation_controller, set_relay_on_for, [1, 1800]}).
+% %%%ecron_server:add_cronjob(water_cuczucs, "30 15 * * *", {irrigation_controller, set_relay_on_for, [2, 1800]}).
+% %%%ecron_server:add_cronjob(water_upper_pumpkins, "00 16 * * *", {irrigation_controller, set_relay_on_for, [3, 1800]}).
+% %%%%%%%%%%%%%%ecron_server:add_cronjob(water_old_poly_tunnel, "30 18 * * *", {irrigation_controller, set_relay_on_for, [4, 1200]}).
+%
+% Just water things in closhes
+% ecron_server:add_cronjob(water_cuczucs, "30 15 * * *", {irrigation_controller, set_relay_on_for, [2, 1800]}).
+%irrigation_controller:set_relay_on_for(2, 2700).
 
 %%%===================================================================
 %%% API

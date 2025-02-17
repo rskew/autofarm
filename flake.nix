@@ -1,17 +1,17 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-22.11";
+    nixpkgs.url = "nixpkgs/nixos-23.05";
     nix-rebar3.url = "github:axelf4/nix-rebar3";
     nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
-    spago2nix.url = "github:justinwoo/spago2nix";
-    spago2nix.inputs.nixpkgs.follows = "nixpkgs";
-    # TODO
-    purerl.url = "github:rskew/nixpkgs-purerl";
+    spago2nixSource.url = "github:justinwoo/spago2nix";
+    spago2nixSource.inputs.nixpkgs.follows = "nixpkgs";
+    purerl.url = "github:purerl/nixpkgs-purerl";
     purerl.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nix-rebar3, spago2nix, purerl }:
+  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource, purerl }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        spago2nix = import spago2nixSource { inherit pkgs; inherit (pkgs) nodejs; };
         python-ftdi = pkgs.python3.withPackages (p: [ p.pyftdi ]);
         # Script to set the three gpio values (active low)
         # Values for relays 1, 2, 3 and 4 are arguments 1, 2, 3 and 4
@@ -86,7 +86,7 @@
           pkgs.spago
           pkgs.purescript
           purerl.packages.x86_64-linux.purerl-0-0-18
-          spago2nix.packages.x86_64-linux.spago2nix
+          spago2nix
         ];
         shellHook = ''
           cd erlang/apps/event_scheduler
@@ -231,7 +231,7 @@
               after = [ "network-pre.target" ];
               wants = [ "network-pre.target" ];
               wantedBy = [ "multi-user.target" ];
-              path = [pkgs.gawk];
+              path = [ pkgs.gawk ];
               environment = {
                 AUTOFARM_DEVICE_MONITOR_DEVICE_LISTENER_PORT = toString(cfg.deviceMonitorDeviceListenerPort);
                 AUTOFARM_DEVICE_MONITOR_INFLUXDB_PORT = toString(cfg.deviceMonitorInfluxdbPort);
@@ -242,9 +242,6 @@
               serviceConfig = {
                 Restart = "always";
                 RestartSec = 10;
-                StartLimitBurst = 8640;
-                StartLimitIntervalSec = 86400;
-                StartLimitInterval = 86400;
                 ExecStart = "${packages.x86_64-linux.autofarm}/bin/autofarm foreground";
               };
             };
@@ -343,7 +340,17 @@
         ];
         shellHook = ''
           cd devices/test_purs
-          npm run
+          npm run # show all scripts in package.json
+
+          cat << EOF
+          Build and run the program with library implementation that just logs to console:
+              buildPrinty
+              runPrinty
+
+          Build and run the program with library implementation runs locally via node:
+              buildSimNode
+              runSimNode
+          EOF
         '';
       };
 
@@ -356,67 +363,96 @@
         ];
         shellHook = ''
           cd devices/test_ota_update
-          npm run
+          npm run # show all scripts in package.json
         '';
       };
 
-      packages.x86_64-linux.postgresWrapperDev =
-        let hbaFile = pkgs.writeText "pg_hba.conf" ''
-              host all all 0.0.0.0/0 md5
-              host all all ::0/0     md5
-            '';
-        in pkgs.writeShellApplication {
-             name = "postgres-wrapper";
-             runtimeInputs = [ (pkgs.postgresql.withPackages (p: [ p.postgis ])) ];
-             text = ''
-               # For some reason zellij sends SIGHUP to commands on exit,
-               # which isn't a strong-enough signal to stop postgres
-               stop_postgres() {
-                 echo Received exit signal, stopping postgres
-                 kill -INT "$postgres_pid"
-               }
-               trap stop_postgres SIGHUP SIGINT SIGTERM
-               # Run postgres listening for TCP connections
-               postgres -c unix_socket_directories= -c hba_file=${hbaFile} &
-               postgres_pid=$!
-               echo postgres_pid: "$postgres_pid"
-               wait
-             '';
-           };
+      packages.x86_64-linux.postgresHbaFileDev = pkgs.writeText "pg_hba_dev.conf" ''
+        local all all              trust
+        host  all all 127.0.0.1/32 trust
+        host  all all ::1/128      trust
+      '';
+      packages.x86_64-linux.postgresWrapperDev = pkgs.writeShellApplication {
+        name = "postgres-wrapper";
+        runtimeInputs = [ (pkgs.postgresql.withPackages (p: [ p.postgis ])) ];
+        text = ''
+          # For some reason zellij sends SIGHUP to commands on exit,
+          # which isn't a strong-enough signal to stop postgres
+          stop_postgres() {
+            echo Received exit signal, stopping postgres
+            pg_ctl stop -w
+          }
+          trap stop_postgres SIGHUP SIGINT SIGTERM
+          # Run postgres listening for TCP connections
+          pg_ctl start -w -o "-c unix_socket_directories= -c hba_file=${packages.x86_64-linux.postgresHbaFileDev}"
+          sleep infinity
+          wait
+        '';
+      };
 
-      devShells.x86_64-linux.db = pkgs.mkShell {
+      devShells.x86_64-linux.db-dev = pkgs.mkShell rec {
         buildInputs = [
           pkgs.pgcli
           pkgs.postgresql
           pkgs.postgresqlPackages.postgis
           packages.x86_64-linux.postgresWrapperDev
           (pkgs.writeShellApplication {
-            name = "initialize-db";
-            runtimeInputs = [ packages.x86_64-linux.postgresWrapperDev ];
+            name = "initialize-db-empty";
+            runtimeInputs = [ (pkgs.postgresql.withPackages (p: [ p.postgis ])) ];
             text = ''
               mkdir .db-data
               echo "$PGPASSWORD" > pwfile
               initdb --user "$PGUSER" --pwfile=./pwfile
               rm pwfile
-              postgres-wrapper &
-              postgres_pid=$!
-              for i in 1 2 3; do # wait for the database to start
-                if psql -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS postgis_raster;" > /dev/null;
-                  then
-                    echo Successfully initializing database
-                    break
-                  else sleep 1;
-                fi
-                if [[ "$i" = 3 ]];
-                  then
-                    echo "Failed to initialize database"
-                    exit 1
-                  else
-                    echo "Retrying..."
-                fi
-              done
-              kill -TERM "$postgres_pid"
-              wait
+              pg_ctl start -w -o "-c unix_socket_directories= -c hba_file=${packages.x86_64-linux.postgresHbaFileDev}"
+              psql -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS postgis_raster;"
+              worked=$?
+              pg_ctl stop -w
+              if [ "$worked" -eq 0 ];
+              then echo Successfully initialized database
+              else echo Failed to initialize database
+              fi
+            '';
+          })
+          # TODO move this out of repo, maybe into machine-configuration/applications
+          # PGBACKREST_CONFIG=$PWD/pgbackrest.conf PGBACKREST_STANZA=farmdb nix develop .#db-dev --command initialize-db-from-prod
+          (pkgs.writeShellApplication {
+            name = "initialize-db-from-prod";
+            runtimeInputs = [ pkgs.pgbackrest packages.x86_64-linux.postgresWrapperDev ];
+            text = ''
+              # Dereference variables to raise an error if unset
+              echo "PGDATA: $PGDATA"
+              echo "PGBACKREST_CONFIG: $PGBACKREST_CONFIG"
+              echo "PGBACKREST_STANZA: $PGBACKREST_STANZA"
+              echo "PGBACKREST_REPO1_S3_KEY: $(if [ -n "$PGBACKREST_REPO1_S3_KEY" ]; then echo set; else echo unset; fi)"
+              echo "PGBACKREST_REPO1_S3_KEY_SECRET: $(if [ -n "$PGBACKREST_REPO1_S3_KEY_SECRET" ]; then echo set; else echo unset; fi)"
+              echo "PGBACKREST_REPO1_CIPHER_PASS: $(if [ -n "$PGBACKREST_REPO1_CIPHER_PASS" ]; then echo set; else echo unset; fi)"
+
+              test ! -d "$PGDATA" && echo "Data directory $PGDATA must exist. Create via initialize-db-empty" && exit 1
+
+              echo Backing up pg_ident.conf postgresql.conf pg_hba.conf postmaster.opts
+              now=$(date "+%s")
+              mkdir /tmp/restoring-db-"$now"
+              cp "$PGDATA"/pg_ident.conf "$PGDATA"/postgresql.conf "$PGDATA"/pg_hba.conf "$PGDATA"/postmaster.opts /tmp/restoring-db-"$now"
+
+              # run pgbackrest restore
+              echo Restoring prod backup to local DB
+              pgbackrest --delta restore
+
+              echo Restoring pg_ident.conf postgresql.conf pg_hba.conf postmaster.opts
+              cp /tmp/restoring-db-"$now"/pg_ident.conf /tmp/restoring-db-"$now"/postgresql.conf /tmp/restoring-db-"$now"/pg_hba.conf /tmp/restoring-db-"$now"/postmaster.opts "$PGDATA"
+              rm -rf /tmp/restoring-db-"$now"
+
+              echo Checking connection to DB
+              pg_ctl start -w -o "-c unix_socket_directories= -c hba_file=${packages.x86_64-linux.postgresHbaFileDev}"
+              ${pkgs.inotify-tools}/bin/inotifywait -e delete_self "$PGDATA"/recovery.signal
+              psql -c "SELECT * FROM pg_catalog.pg_tables WHERE schemaname = 'public';"
+              worked=$?
+              pg_ctl stop -w
+              if [ "$worked" -eq 0 ];
+              then echo Successfully initialized database
+              else echo Failed to initialize database
+              fi
             '';
           })
         ];

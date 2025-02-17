@@ -84,16 +84,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1672353432,
-        "narHash": "sha256-oZfgp/44/o2tWiylV30cR+DLyWTJ+5dhsdWZVpzs3e4=",
+        "lastModified": 1686331006,
+        "narHash": "sha256-hElRDWUNG655aqF0awu+h5cmDN+I/dQcChRt2tGuGGU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "913a47cd064cc06440ea84e5e0452039a85781f0",
+        "rev": "85bcb95aa83be667e562e781e9d186c57a07d757",
         "type": "github"
       },
       "original": {
         "id": "nixpkgs",
-        "ref": "nixos-22.11",
+        "ref": "nixos-23.05",
         "type": "indirect"
       }
     },
@@ -105,15 +105,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1673167500,
-        "narHash": "sha256-TnkOx+gy6Nh608oseqoFYqmNnpkspCbK67UyuuyxvL4=",
-        "owner": "rskew",
+        "lastModified": 1688979879,
+        "narHash": "sha256-17jHbMZ3UdyJZvtZVOOzM7J9wgWWHBnUiaaM9WZBDiE=",
+        "owner": "purerl",
         "repo": "nixpkgs-purerl",
-        "rev": "b8e316e9458f79ccbb71a1fbd2d99e7ab504836b",
+        "rev": "c6df9171735273d5a734438bd5d235fe9c42a2e4",
         "type": "github"
       },
       "original": {
-        "owner": "rskew",
+        "owner": "purerl",
         "repo": "nixpkgs-purerl",
         "type": "github"
       }
@@ -123,10 +123,10 @@
         "nix-rebar3": "nix-rebar3",
         "nixpkgs": "nixpkgs",
         "purerl": "purerl",
-        "spago2nix": "spago2nix"
+        "spago2nixSource": "spago2nixSource"
       }
     },
-    "spago2nix": {
+    "spago2nixSource": {
       "inputs": {
         "easy-purescript-nix": "easy-purescript-nix",
         "flake-utils": "flake-utils_3",
