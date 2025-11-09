@@ -61,6 +61,21 @@
         "type": "github"
       }
     },
+    "gleam-nixpkgs": {
+      "locked": {
+        "lastModified": 1762424912,
+        "narHash": "sha256-9L4djKH5DIBL2pnUwcQjsQrRjUOeHsKv7plx6nL12Z0=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "550b5f9baa1619097186676736962f9365b71589",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nix-rebar3": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -120,6 +135,7 @@
     },
     "root": {
       "inputs": {
+        "gleam-nixpkgs": "gleam-nixpkgs",
         "nix-rebar3": "nix-rebar3",
         "nixpkgs": "nixpkgs",
         "purerl": "purerl",

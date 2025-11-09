@@ -7,9 +7,10 @@
     spago2nixSource.inputs.nixpkgs.follows = "nixpkgs";
     purerl.url = "github:purerl/nixpkgs-purerl";
     purerl.inputs.nixpkgs.follows = "nixpkgs";
+    gleam-nixpkgs.url = "github:nixos/nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource, purerl }:
+  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource, purerl, gleam-nixpkgs }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
         spago2nix = import spago2nixSource { inherit pkgs; inherit (pkgs) nodejs; };
         python-ftdi = pkgs.python3.withPackages (p: [ p.pyftdi ]);
@@ -22,6 +23,7 @@
           let "bits = 255 - $1 - $2 * 8 - $3 * 2 - $4 * 16"
           ${python-ftdi}/bin/python ${./devices/irrigation_controller_ftdi_gpio/set-gpio.py} $bits
         '';
+        gpkgs = gleam-nixpkgs.legacyPackages.x86_64-linux;
     in rec {
 
       devShells.x86_64-linux.mcu = pkgs.mkShell {
@@ -508,6 +510,40 @@
              p.bytestring
            ]))
          ];
+      };
+
+      devShells.x86_64-linux.gleam-backend = gpkgs.mkShell {
+        packages = [
+          gpkgs.gleam
+          gpkgs.beam28Packages.erlang
+          gpkgs.beam28Packages.elixir
+          gpkgs.rebar3
+        ];
+        shellHook = ''
+          cd gleam-backend
+          cat <<EOF
+            gleam run -- ttyUSB0
+          EOF
+        '';
+      };
+      devShells.x86_64-linux.gleam-frontend = gpkgs.mkShell {
+        packages = [
+          gpkgs.gleam
+          gpkgs.beam28Packages.erlang
+          gpkgs.rebar3
+          gpkgs.tailwindcss_4
+          gpkgs.bun
+        ];
+        shellHook = ''
+          cd gleam-frontend
+          cat <<EOF
+            Run the dev beckend available in the 'gleam-backend' shell
+              cd ..; nix develop .#gleam-backend
+
+            Build the frontend via:
+              gleam build
+          EOF
+        '';
       };
     };
 }
