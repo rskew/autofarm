@@ -518,6 +518,7 @@
           gpkgs.beam28Packages.erlang
           gpkgs.beam28Packages.elixir
           gpkgs.rebar3
+          gpkgs.sqlite
         ];
         shellHook = ''
           cd gleam-backend
@@ -541,7 +542,69 @@
               cd ..; nix develop .#gleam-backend
 
             Build the frontend via:
-              gleam build
+              gleam run -m lustre/dev build --outdir=../gleam-backend/priv/public
+          EOF
+        '';
+      };
+      devShells.x86_64-linux.lora-node =
+      let
+        #arduinoEsp32 = gpkgs.fetchFromGitHub {
+        #  owner = "espressif";
+        #  repo = "arduino-esp32";
+        #  tag = "3.3.4";
+        #  hash = "sha256-efqYlgZ/T2QSAmffwVJvWNjcdEtGDW3BMa1ndVN9qRs=";
+        #};
+        #esptool = gpkgs.fetchFromGitHub {
+        #  owner = "espressif";
+        #  repo = "esptool";
+        #  tag = "v5.1.0";
+        #  hash = "sha256-pdkL/QfrrTs/NdXlsr+2Yo+r8UTFLkxw4E6XGDAt1yE=";
+        #};
+        #arduinoDataDir = gpkgs.runCommand "arduinoDataDir" {} ''
+        #  mkdir -p $out/packages/esp32/hardware/esp32
+        #  ln -s ${arduinoEsp32} $out/packages/esp32/hardware/esp32/3.3.4
+        #  mkdir -p $out/packages/esp32/tools/esptool_py
+        #  ln -s ${esptool} $out/packages/esp32/tools/esptool_py/5.1.0
+        #  ln -s /tmp/arduino-inventory.yaml $out/inventory.yaml
+        #  ln -s /tmp/arduino-staging $out/staging
+        #'';
+        lora = gpkgs.fetchFromGitHub {
+          owner = "sandeepmistry";
+          repo = "arduino-LoRa";
+          rev = "f7b08b06373880a2a17e55577c0ddb759c608e62"; # 2024-06-13
+          hash = "sha256-d/vgYw9fgVOESTuuH/11P0Y5mUEloS00ldWx+o2wFaI=";
+        };
+        arduinoUserDir = gpkgs.runCommand "arduinoUserDir" {} ''
+          mkdir -p $out/libraries
+          ln -s ${lora} $out/libraries/lora
+        '';
+        arduinoCliConfig = gpkgs.writeText "arduinoCliConfig" ''
+          board_manager:
+              additional_urls: []
+          directories:
+              #data: $${arduinoDataDir}
+              user: ${arduinoUserDir}
+        '';
+        arduinoCliWithConfig = gpkgs.writeShellScriptBin "arduino-cli-hello" ''
+          mkdir -p /tmp/arduino-staging
+          ${gpkgs.lib.getExe gpkgs.arduino-cli} --config-file ${arduinoCliConfig} "$@"
+        '';
+      in
+      gpkgs.mkShell {
+        packages = [
+          arduinoCliWithConfig
+        ];
+        shellHook = ''
+          cd lora-node
+          cat <<EOF
+            Compile and upload Gateway sketch:
+                arduino-cli-hello compile -b esp32:esp32:esp32da -p /dev/ttyUSB0 -u Gateway
+
+            Monitor node MCU:
+                arduino-cli-hello monitor -p /dev/ttyUSB1 --config baudrate=115200
+
+            Compile and upload Node sketch:
+                arduino-cli-hello compile -b esp32:esp32:esp32da -p /dev/ttyUSB1 -u Node
           EOF
         '';
       };
