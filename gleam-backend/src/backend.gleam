@@ -120,7 +120,7 @@ fn broadcaster_handle_message(state, msg) {
         process.send(sub, ForwardFromBackend(m))
       })
       let messages = case list.length(messages) {
-        a if a > 50 -> case list.rest(messages) {
+        a if a > 100 -> case list.rest(messages) {
           Ok(tail) -> tail
           Error(_) -> []  // Can't happen due to checking the length
         }

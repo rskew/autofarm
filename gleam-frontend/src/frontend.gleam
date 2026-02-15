@@ -206,16 +206,23 @@ fn view(model: Model) -> Element(Msg) {
     html.div([],
       list.map(solenoids, fn(solenoid_kv) {
         let #(solenoid_id, solenoid) = solenoid_kv
+        let colour = case solenoid.on_or_off {
+          Some(On) -> "#0af"
+          Some(Off) -> "#777"
+          None -> "#ccc"
+        }
         html.div([attribute.styles([
           #("margin-top", "10px"),
           #("margin-bottom", "10px"),
-          #("border", "1px solid #444")
+          #("border", "2px solid " <> colour)
         ])], [
           html.div([
             attribute.styles([
               #("margin", "5px"),
               #("color", "#444"),
               #("font-size", "20px"),
+              #("display", "flex"),
+              #("flex-direction", "row")
             ])
           ], [
             html.text(solenoid.name),
@@ -223,13 +230,13 @@ fn view(model: Model) -> Element(Msg) {
               None -> html.div([], [])
               Some(On) -> html.div([
                 attribute.styles([
-                  #("color", "#0af")
+                  #("color", colour), #("margin-left", "10px")
                 ])], [
                   html.text("watering")
                 ])
               Some(Off) -> html.div([
                 attribute.styles([
-                  #("color", "#666"),
+                  #("color", colour), #("margin-left", "10px")
                 ])], [
                   html.text("off")
                 ])
@@ -263,13 +270,6 @@ fn view(model: Model) -> Element(Msg) {
         ])
       })
     ),
-    html.div([], [
-      html.textarea([attribute.readonly(True),
-                     attribute.styles([
-                       #("width", "95vw"),
-                       #("height", "30vh")])],
-                    string.join(model.messages_rev, "\n"))
-    ])
     // scheduled_action_form_view(model)
   ])
 }
