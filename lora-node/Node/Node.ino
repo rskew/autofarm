@@ -16,12 +16,13 @@ HammingCode hamming;
 
 int NODE_NUMBER = 1;
 int solenoidPins[5] = {27, 26, 25, 33, 32};
+unsigned long offTimes[5] = {0, 0, 0, 0, 0};
 
 struct Action {
     int nodeNumber;
     int solenoidNumber;
     bool onOrOff;
-    int minutesOn;
+    int secondsOn;
 };
 
 String receivedMessage;
@@ -33,9 +34,9 @@ void setup() {
   Serial.print("Node " + String(NODE_NUMBER) + " \r\n");
 
   for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
-    int pin_index = solenoid_number - 1;
-    pinMode(solenoidPins[pin_index], OUTPUT);
-    digitalWrite(solenoidPins[pin_index], LOW);
+    int index = solenoid_number - 1;
+    pinMode(solenoidPins[index], OUTPUT);
+    digitalWrite(solenoidPins[index], LOW);
   }
 
   LoRa.setPins(ss, rst, dio0);
@@ -56,6 +57,14 @@ void loop() {
   String receivedMessage = "";
   int rssi;
   int errorsCorrected;
+  for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
+    int index = solenoid_number - 1;
+    if (offTimes[index] != 0 && millis() > offTimes[index]) {
+      digitalWrite(solenoidPins[index], LOW);
+      loRaSendMessage("n" + String(NODE_NUMBER) + "s" + String(solenoid_number) + "off");
+      offTimes[index] = 0;
+    };
+  };
   if (loRaReceiveMessage(receivedMessage, rssi, errorsCorrected)) {
     Serial.print("Node '" + String(NODE_NUMBER) + "': "
       + "Received LoRa packet: '" + receivedMessage + "' "
@@ -67,8 +76,8 @@ void loop() {
         + "Error parsing message: '" + receivedMessage + "'";
       Serial.print(messageToSend + "\r\n");
     } else {
-      int pin_index = receivedAction.solenoidNumber - 1;
-      int pin = solenoidPins[pin_index];
+      int index = receivedAction.solenoidNumber - 1;
+      int pin = solenoidPins[index];
       if (receivedAction.onOrOff) {
         digitalWrite(pin, HIGH);
         String messageToSend = "n" + String(NODE_NUMBER) + "s" + String(receivedAction.solenoidNumber) + "on";
@@ -76,13 +85,15 @@ void loop() {
         if (!loRaSendMessage(messageToSend)) {
           Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
         }
+        offTimes[index] = millis() + receivedAction.secondsOn * 1000UL;
       } else {
         digitalWrite(pin, LOW);
         String messageToSend = "n" + String(NODE_NUMBER) + "s" + String(receivedAction.solenoidNumber) + "off";
         Serial.print(messageToSend + "\r\n");
         if (!loRaSendMessage(messageToSend)) {
           Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
-        }
+        };
+        offTimes[index] = 0;
       };
     };
   };
@@ -113,7 +124,7 @@ bool parseMessage(String message, Action& result) {
   } else {
     return false;
   };
-  result.minutesOn = message.substring(7).toInt();
+  result.secondsOn = message.substring(7).toInt();
   return true;
 }
 
