@@ -186,7 +186,11 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 
 fn view(model: Model) -> Element(Msg) {
   let solenoids = list.sort(dict.to_list(model.solenoids), fn(a, b) {int.compare(a.0, b.0)})
-  html.div([], [
+  html.div([
+    attribute.styles([
+      #("font-family", "sans")
+    ])
+  ], [
     html.div([], [
       case model.ws {
         None -> html.div([
@@ -196,7 +200,7 @@ fn view(model: Model) -> Element(Msg) {
             html.text("Disconnected from server")
           ])
         Some(_) -> html.div([
-          attribute.styles([#("color", "#0af"),
+          attribute.styles([#("color", "#0d8"),
                             #("font-size", "13px")]),
           ], [
             html.text("Connected to server")
@@ -270,6 +274,13 @@ fn view(model: Model) -> Element(Msg) {
         ])
       })
     ),
+    html.div([], [
+      html.textarea([attribute.readonly(True),
+                     attribute.styles([
+                       #("width", "95vw"),
+                       #("height", "30vh")])],
+                    string.join(model.messages_rev, "\n"))
+    ])
     // scheduled_action_form_view(model)
   ])
 }

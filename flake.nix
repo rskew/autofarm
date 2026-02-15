@@ -1,18 +1,28 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-23.05";
-    nix-rebar3.url = "github:axelf4/nix-rebar3";
-    nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
-    spago2nixSource.url = "github:justinwoo/spago2nix";
-    spago2nixSource.inputs.nixpkgs.follows = "nixpkgs";
-    purerl.url = "github:purerl/nixpkgs-purerl";
-    purerl.inputs.nixpkgs.follows = "nixpkgs";
+    #nixpkgs.url = "nixpkgs/nixos-23.05";
+    #nix-rebar3.url = "github:axelf4/nix-rebar3";
+    #nix-rebar3.inputs.nixpkgs.follows = "nixpkgs";
+    #spago2nixSource.url = "github:justinwoo/spago2nix";
+    #spago2nixSource.inputs.nixpkgs.follows = "nixpkgs";
+    #purerl.url = "github:purerl/nixpkgs-purerl";
+    #purerl.inputs.nixpkgs.follows = "nixpkgs";
     gleam-nixpkgs.url = "github:nixos/nixpkgs";
+    nix-gleam.url = "github:arnarg/nix-gleam";
+    nix-gleam.inputs.nixpkgs.follows = "gleam-nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nix-rebar3, spago2nixSource, purerl, gleam-nixpkgs }:
+  outputs = {
+    self,
+    nixpkgs,
+    #nix-rebar3,
+    #spago2nixSource,
+    #purerl,
+    gleam-nixpkgs,
+    nix-gleam
+  }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
-        spago2nix = import spago2nixSource { inherit pkgs; inherit (pkgs) nodejs; };
+        #spago2nix = import spago2nixSource { inherit pkgs; inherit (pkgs) nodejs; };
         python-ftdi = pkgs.python3.withPackages (p: [ p.pyftdi ]);
         # Script to set the three gpio values (active low)
         # Values for relays 1, 2, 3 and 4 are arguments 1, 2, 3 and 4
@@ -87,8 +97,8 @@
         buildInputs = [
           pkgs.spago
           pkgs.purescript
-          purerl.packages.x86_64-linux.purerl-0-0-18
-          spago2nix
+          #purerl.packages.x86_64-linux.purerl-0-0-18
+          #spago2nix
         ];
         shellHook = ''
           cd erlang/apps/event_scheduler
@@ -113,7 +123,7 @@
             pkgs.stdenv.mkDerivation {
               name = "build-project-output";
               src = src;
-              buildInputs = [ purs purerl.packages.x86_64-linux.purerl-0-0-18 ];
+              #buildInputs = [ purs purerl.packages.x86_64-linux.purerl-0-0-18 ];
               installPhase = ''
                 mkdir -p $out
                 purs compile "$src/**/*.purs" ${builtins.toString
@@ -129,26 +139,26 @@
             purs = pkgs.purescript;
           };
         in builtPursSources;
-      packages.x86_64-linux.autofarm =
-        ((pkgs.callPackage nix-rebar3 {}).buildRebar3 {
-          root = ./erlang;
-          pname = "autofarm";
-          version = "0.1.0";
-          releaseType = "release";
-        }).overrideAttrs (finalAttrs: previousAttrs: {
-          preBuildPhases = [ "linkBangScript" "symlinkPurerl" "symlinkPrivToFrontend" ];
-          linkBangScript = ''
-            substituteInPlace apps/device_monitor/src/irrigation_controller.erl --replace "\$bang" "${bang}/bin/bang"
-          '';
-          symlinkPurerl = ''
-            rm apps/event_scheduler/src/output
-            ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/event_scheduler/src/output
-          '';
-          symlinkPrivToFrontend = ''
-            rm apps/frontend_server/priv
-            ln -s ${packages.x86_64-linux.frontend} apps/frontend_server/priv
-          '';
-        });
+      #packages.x86_64-linux.autofarm =
+      #  ((pkgs.callPackage nix-rebar3 {}).buildRebar3 {
+      #    root = ./erlang;
+      #    pname = "autofarm";
+      #    version = "0.1.0";
+      #    releaseType = "release";
+      #  }).overrideAttrs (finalAttrs: previousAttrs: {
+      #    preBuildPhases = [ "linkBangScript" "symlinkPurerl" "symlinkPrivToFrontend" ];
+      #    linkBangScript = ''
+      #      substituteInPlace apps/device_monitor/src/irrigation_controller.erl --replace "\$bang" "${bang}/bin/bang"
+      #    '';
+      #    symlinkPurerl = ''
+      #      rm apps/event_scheduler/src/output
+      #      ln -s ${packages.x86_64-linux.autofarm-purerl}/output apps/event_scheduler/src/output
+      #    '';
+      #    symlinkPrivToFrontend = ''
+      #      rm apps/frontend_server/priv
+      #      ln -s ${packages.x86_64-linux.frontend} apps/frontend_server/priv
+      #    '';
+      #  });
       devShells.x86_64-linux.influxdb = pkgs.mkShell {
         buildInputs = [
           pkgs.influxdb
@@ -258,7 +268,7 @@
           pkgs.purescript
           pkgs.nodejs
           pkgs.nodePackages.node2nix
-          spago2nix
+          #spago2nix
         ];
         shellHook = ''
           cd frontend
@@ -511,6 +521,31 @@
            ]))
          ];
       };
+
+      nixosModules.gleam-backend =
+        { lib, config, pkgs, ... }:
+        {
+          networking.firewall.allowedTCPPorts = [ 8006 ];
+          systemd.services.gleam-backend = {
+            description = "Irrigation control backend (gleam)";
+            after = [ "network.target" ];
+            wantedBy = [ "multi-user.target" ];
+            path = [
+              gpkgs.gleam
+              gpkgs.beam28Packages.erlang
+              gpkgs.beam28Packages.elixir
+              gpkgs.rebar3
+              gpkgs.sqlite
+            ];
+            serviceConfig = {
+              ExecStart = "gleam run -- ttyUSB0";
+              WorkingDirectory = ./gleam-backend;
+              Restart = "on-failure";
+              RestartSec = 5;
+              SupplementaryGroups = [ "dialout" ];
+            };
+          };
+        };
 
       devShells.x86_64-linux.gleam-backend = gpkgs.mkShell {
         packages = [
