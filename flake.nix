@@ -8,8 +8,6 @@
     #purerl.url = "github:purerl/nixpkgs-purerl";
     #purerl.inputs.nixpkgs.follows = "nixpkgs";
     gleam-nixpkgs.url = "github:nixos/nixpkgs";
-    nix-gleam.url = "github:arnarg/nix-gleam";
-    nix-gleam.inputs.nixpkgs.follows = "gleam-nixpkgs";
   };
 
   outputs = {
@@ -19,7 +17,6 @@
     #spago2nixSource,
     #purerl,
     gleam-nixpkgs,
-    nix-gleam
   }:
     let pkgs = nixpkgs.legacyPackages.x86_64-linux;
         #spago2nix = import spago2nixSource { inherit pkgs; inherit (pkgs) nodejs; };
@@ -524,7 +521,17 @@
 
       nixosModules.gleam-backend =
         { lib, config, pkgs, ... }:
-        {
+        let
+          src = gpkgs.runCommand "gleam-backend-src" {} ''
+            mkdir -p $out
+            cp -r ${./gleam-backend}/* $out/
+            chmod -R u+w $out
+            # Fix the local package path to point to the nix store copy
+            substituteInPlace $out/gleam.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
+            substituteInPlace $out/manifest.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
+          '';
+          workDir = "/var/lib/gleam-backend";
+        in {
           networking.firewall.allowedTCPPorts = [ 8006 ];
           systemd.services.gleam-backend = {
             description = "Irrigation control backend (gleam)";
@@ -536,13 +543,30 @@
               gpkgs.beam28Packages.elixir
               gpkgs.rebar3
               gpkgs.sqlite
+              gpkgs.gnumake
+              gpkgs.gcc
             ];
+            environment.HOME = workDir;
             serviceConfig = {
-              ExecStart = "gleam run -- ttyUSB0";
-              WorkingDirectory = ./gleam-backend;
+              ExecStartPre = let script = pkgs.writeShellScript "gleam-backend-setup" ''
+                cd /tmp
+                #rm -rf ${workDir}
+                mkdir -p ${workDir}
+                cp -r ${src}/* ${workDir}/
+                mkdir -p ${workDir}/priv
+                touch ${workDir}/priv/db.sqlite
+                ln -s /home/rowan/autofarm/gleam-backend/priv/public ${workDir}/priv/public
+                chmod -R u+w ${workDir}
+                export HOME=${workDir}
+                cd ${workDir}
+                ${gpkgs.beam28Packages.elixir}/bin/mix local.hex --force
+              ''; in "+${script}";
+              ExecStart = "${gpkgs.gleam}/bin/gleam run -- ttyUSB0";
+              WorkingDirectory = workDir;
               Restart = "on-failure";
               RestartSec = 5;
               SupplementaryGroups = [ "dialout" ];
+              StateDirectory = "gleam-backend";
             };
           };
         };
