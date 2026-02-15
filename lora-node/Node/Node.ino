@@ -63,6 +63,7 @@ void loop() {
       digitalWrite(solenoidPins[index], LOW);
       loRaSendMessage("n" + String(NODE_NUMBER) + "s" + String(solenoid_number) + "off");
       offTimes[index] = 0;
+      Serial.print("Watering duration complete: Turning off " + String(solenoid_number) + "\r\n");
     };
   };
   if (loRaReceiveMessage(receivedMessage, rssi, errorsCorrected)) {
@@ -86,6 +87,7 @@ void loop() {
           Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
         }
         offTimes[index] = millis() + receivedAction.secondsOn * 1000UL;
+        Serial.print("millis(): " + String(millis()) + ", setting offTimes[" + String(index) + " to : " + String(offTimes[index]) + "\r\n");
       } else {
         digitalWrite(pin, LOW);
         String messageToSend = "n" + String(NODE_NUMBER) + "s" + String(receivedAction.solenoidNumber) + "off";

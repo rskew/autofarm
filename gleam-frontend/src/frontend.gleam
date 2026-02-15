@@ -5,6 +5,7 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, Some, None}
+import gleam/pair
 import gleam/string
 import gleam/time/calendar
 import gleam/time/duration
@@ -184,6 +185,7 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 }
 
 fn view(model: Model) -> Element(Msg) {
+  let solenoids = list.sort(dict.to_list(model.solenoids), fn(a, b) {int.compare(a.0, b.0)})
   html.div([], [
     html.div([], [
       case model.ws {
@@ -202,7 +204,7 @@ fn view(model: Model) -> Element(Msg) {
       }
     ]),
     html.div([],
-      list.map(dict.to_list(model.solenoids), fn(solenoid_kv) {
+      list.map(solenoids, fn(solenoid_kv) {
         let #(solenoid_id, solenoid) = solenoid_kv
         html.div([attribute.styles([
           #("margin-top", "10px"),
