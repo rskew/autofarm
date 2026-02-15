@@ -16,16 +16,9 @@ HammingCode hamming;
 #define dio0 2
 
 
-struct Action {
-    String nodeName;
-    String onOff;
-    int minutesOn;
-};
-
 void setup() {
   Serial.begin(115200);
   while (!Serial);
-  Serial.print("LoRa Gateway\r\n");
 
   LoRa.setPins(ss, rst, dio0);
   
@@ -33,7 +26,7 @@ void setup() {
     Serial.print(".");
     delay(500);
   };
-  Serial.print("Gateway: LoRa Initializing OK!\r\n");
+  Serial.print("LoRa Initializing OK\r\n");
 }
 
 void loop() {
@@ -42,9 +35,10 @@ void loop() {
   int rssi;
   int errorsCorrected;
   if (loRaReceiveMessage(loRaMessage, rssi, errorsCorrected)) {
-    Serial.print("Gateway: Received LoRa packet '" + loRaMessage + "' "
-      + "with RSSI " + rssi + " "
-      + "and " + errorsCorrected + " errors corrected\r\n");
+    Serial.print(loRaMessage + "\r\n");
+    Serial.print("INFO Received LoRa message '" + loRaMessage + "' "
+      + "RSSI " + String(rssi) + " "
+      + String(errorsCorrected) + " errors corrected\r\n");
   };
 
   // Handle messages from server
@@ -54,48 +48,10 @@ void loop() {
     if (Serial.peek() == '\n') {
       Serial.read();
     }
-    Action receivedAction = {};
-    if (!parseMessage(serverMessage, receivedAction)) {
-      Serial.print("Gateway: Error parsing server message: '" + serverMessage + "'\r\n");
-    } else {
-      Serial.print("Gateway: Yay parsed server message and sent to node: '" + serverMessage + "'\r\n");
-      if (!loRaSendMessage(serverMessage)) {
-        Serial.print("Gateway: Error sending message '" + serverMessage + "'\r\n");
-      }
+    if (!loRaSendMessage(serverMessage)) {
+      Serial.print("INFO Error sending LoRa message '" + serverMessage + "'\r\n");
     };
   }
-}
-
-bool parseMessage(String message, Action& result) {
-  int firstSpace = message.indexOf(' ');
-  if (firstSpace == -1) {
-    return false;
-  };
-  String nodeName = message.substring(0, firstSpace);
-  String remainingData = message.substring(firstSpace + 1);
-
-  int secondSpace = remainingData.indexOf(' ');
-  String onOff = "";
-  if (secondSpace == -1) {
-    onOff = remainingData;
-  } else {
-    onOff = remainingData.substring(0, secondSpace);
-  };
-  result.nodeName = nodeName;
-  result.onOff = onOff;
-  if (onOff == "on") {
-    if (secondSpace == -1) {
-      return false;
-    };
-    String minutesOnStr = remainingData.substring(secondSpace + 1);
-    int minutesOn = minutesOnStr.toInt();
-    if (minutesOn == 0) {
-      return false;
-    }
-    result.minutesOn = minutesOn;
-  } else if (onOff == "off") {
-  };
-  return true;
 }
 
 // Hamming-encode the contents of the message

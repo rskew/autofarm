@@ -171,14 +171,12 @@ fn parse_serial_message(payload: dynamic.Dynamic) -> Result(String, String) {
     Ok(#(tag, device, message)) -> {
       case message {
         Ok(m) -> {
-          let ok_message = string.concat([tag, ": ", device, " \"", m, "\""])
-          io.println("Received: " <> ok_message)
-          Ok(ok_message)
+          io.println("Received: " <> tag <> ": " <> device <> " \"" <> m <> "\"")
+          Ok(m)
         }
         Error(err) -> {
-          let err_message = "Error from " <> tag <> " " <> device <> ": " <> err
-          io.println("Received: " <> err_message)
-          Error(err_message)
+          io.println("Received error from " <> tag <> " " <> device <> ": " <> err)
+          Error(err)
         }
       }
     }

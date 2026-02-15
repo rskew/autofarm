@@ -1,4 +1,5 @@
 import formal/form
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/io
 import gleam/json
@@ -7,6 +8,7 @@ import gleam/option.{type Option, Some, None}
 import gleam/string
 import gleam/time/calendar
 import gleam/time/duration
+import gleam/time/timestamp.{type Timestamp}
 import lustre
 import lustre/attribute
 import lustre/element.{type Element}
@@ -14,9 +16,9 @@ import lustre/element/html
 import lustre/event
 import lustre/effect
 import lustre_websocket as ws
-import shared/action
 import shared/scheduled_action
 import shared/day_of_week.{Monday}
+import shared/on_or_off.{type OnOrOff, On, Off}
 
 pub fn main() {
   let app = lustre.application(init, update, view)
@@ -24,73 +26,118 @@ pub fn main() {
   Nil
 }
 
+type SolenoidState {
+  SolenoidState(
+    name: String,
+    on_or_off: Option(OnOrOff),
+    minutes_next: String,
+    scheduled_off_at: Option(Timestamp),
+  )
+}
+
 type Model {
   Model(
-    state: IrrigationState,
     ws: Option(ws.WebSocket),
-    minutes_on: Int,
+    solenoids: Dict(Int, SolenoidState),
     messages_rev: List(String),
     scheduled_action_form: form.Form(scheduled_action.ScheduledAction)
   )
 }
 
 fn init(_) -> #(Model, effect.Effect(Msg)) {
-  #(Model(state: NotRunning, ws: None, minutes_on: 5, messages_rev: [], scheduled_action_form: scheduled_action_form()),
+  #(Model(ws: None,
+          solenoids: dict.from_list(list.map([
+              #(1, "pumpkins"),
+              #(2, "zucs/poly tunnel"),
+              #(3, "brassica seedlings"),
+              #(4, "flowers"),
+              #(5, "sauce toms"),
+            ], fn(solenoid: #(Int, String)) -> #(Int, SolenoidState) {
+              #(solenoid.0, SolenoidState(name: solenoid.1,
+                              on_or_off: None,
+                              minutes_next: "20",
+                              scheduled_off_at: None))})),
+          messages_rev: [],
+          scheduled_action_form: scheduled_action_form()),
     ws.init("/ws", WsWrapper))
 }
 
 type Msg {
-  UserClickedRunIrrigation
-  UserClickedTurnOffIrrigation
-  UserUpdatedOnTime(String)
+  UserClickedRunIrrigation(solenoid_id: Int)
+  UserClickedTurnOffIrrigation(solenoid_id: Int)
+  UserUpdatedOnTime(solenoid_id: Int, on_time: String)
   WsWrapper(ws.WebSocketEvent)
-  UserSubmittedScheduledActionForm(result: Result(scheduled_action.ScheduledAction, form.Form(scheduled_action.ScheduledAction)))
-}
-
-type IrrigationState {
-  NotRunning
-  UserClickedRun
-  Running
+  UserSubmittedScheduledActionForm(form_result: Result(scheduled_action.ScheduledAction, form.Form(scheduled_action.ScheduledAction)))
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   case msg, model.ws {
-    UserClickedRunIrrigation, Some(socket) -> {
-      let seconds_on = model.minutes_on * 60
-      let payload = "node1hi on " <> int.to_string(seconds_on)
-      #(Model(..model, state: UserClickedRun), ws.send(socket, payload))
+    UserClickedRunIrrigation(solenoid_id), Some(socket) -> {
+      case dict.get(model.solenoids, solenoid_id) {
+        Ok(solenoid) -> {
+          case int.parse(solenoid.minutes_next) {
+            Ok(minutes_on) -> {
+              let seconds_on = minutes_on * 60
+              let payload = "n1s" <> int.to_string(solenoid_id) <> "on " <> int.to_string(seconds_on)
+              let scheduled_off_at = timestamp.add(timestamp.system_time(), duration.seconds(seconds_on))
+              let updated_solenoids = dict.insert(model.solenoids, solenoid_id, SolenoidState(..solenoid, scheduled_off_at: Some(scheduled_off_at)))
+              #(Model(..model, solenoids: updated_solenoids), ws.send(socket, payload))
+            }
+            Error(_) -> {
+              alert("Invalid on duration")
+              #(model, effect.none())
+            }
+          }
+        }
+        Error(_) -> {
+          alert("Failed to run irrigation!")
+          #(model, effect.none())
+        }
+      }
     }
-    UserClickedRunIrrigation, None -> {
+    UserClickedRunIrrigation(_solenoid_number), None -> {
       let _ = alert("Disconnected from server, cannot start irrigation")
       #(model, effect.none())
     }
-    UserClickedTurnOffIrrigation, Some(socket) -> {
-      let payload = "node1hi off"
-      #(Model(..model, state: UserClickedRun), ws.send(socket, payload))
+    UserClickedTurnOffIrrigation(solenoid_id), Some(socket) -> {
+      case dict.get(model.solenoids, solenoid_id) {
+        Ok(solenoid) -> {
+          let payload = "n1s" <> int.to_string(solenoid_id) <> "off"
+          let updated_solenoids = dict.insert(model.solenoids, solenoid_id, SolenoidState(..solenoid, scheduled_off_at: None))
+          #(Model(..model, solenoids: updated_solenoids), ws.send(socket, payload))
+        }
+        Error(_) -> {
+          alert("Failed to turn off irrigation!")
+          #(model, effect.none())
+        }
+      }
     }
-    UserClickedTurnOffIrrigation, None -> {
+    UserClickedTurnOffIrrigation(_solenoid_number), None -> {
       let _ = alert("Disconnected from server, cannot turn off irrigation")
       #(model, effect.none())
     }
-    UserUpdatedOnTime(on_time), _ -> {
-      case int.parse(on_time) {
-        Ok(minutes_on) -> {
-          io.println("New on time: " <> int.to_string(minutes_on))
-          #(Model(..model, minutes_on: minutes_on), effect.none())
+    UserUpdatedOnTime(solenoid_id, on_time), _ -> {
+      case dict.get(model.solenoids, solenoid_id) {
+        Ok(solenoid) -> {
+          let updated_solenoids = dict.insert(model.solenoids, solenoid_id,
+                                              SolenoidState(..solenoid, minutes_next: on_time))
+          #(Model(..model, solenoids: updated_solenoids), effect.none())
         }
-        Error(_) -> #(model, effect.none())
+        Error(_) -> {
+          #(model, effect.none())
+        }
       }
     }
-    UserSubmittedScheduledActionForm(result: Ok(the_scheduled_action)), Some(socket) -> {
+    UserSubmittedScheduledActionForm(form_result: Ok(the_scheduled_action)), Some(socket) -> {
       io.println("Woooo: " <> string.inspect(the_scheduled_action))
       #(model, ws.send(socket, json.to_string(scheduled_action.to_json(the_scheduled_action))))
     }
-    UserSubmittedScheduledActionForm(result: Ok(the_scheduled_action)), None -> {
+    UserSubmittedScheduledActionForm(form_result: Ok(the_scheduled_action)), None -> {
       io.println("No WS but form success Woooo: " <> string.inspect(the_scheduled_action))
       alert("Can't submit action when disconnected from server")
       #(model, effect.none())
     }
-    UserSubmittedScheduledActionForm(result: Error(form)), _ -> {
+    UserSubmittedScheduledActionForm(form_result: Error(form)), _ -> {
       io.println("Form Fail: " <> string.inspect(form))
       #(Model(..model, scheduled_action_form: form), effect.none())
     }
@@ -105,11 +152,28 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     }
     WsWrapper(ws.OnTextMessage(msg)), _ -> {
       io.println("Received ws message: " <> msg)
-      #(Model(..model, messages_rev: [msg, ..model.messages_rev]),
-        effect.none())
+      case parse_message(msg) {
+        Ok(#(_node_number, solenoid_number, on_or_off)) -> {
+          case dict.get(model.solenoids, solenoid_number) {
+            Ok(solenoid) -> {
+              let new_solenoid_state = case on_or_off {
+                On -> SolenoidState(..solenoid, on_or_off: Some(On))
+                Off -> SolenoidState(..solenoid, on_or_off: Some(Off), scheduled_off_at: None)
+              }
+              let updated_solenoids = dict.insert(model.solenoids, solenoid_number, new_solenoid_state)
+              #(Model(..model, solenoids: updated_solenoids), effect.none())
+            }
+            Error(_) -> #(model, effect.none())
+          }
+        }
+        Error(_) -> {
+          #(Model(..model, messages_rev: [msg, ..model.messages_rev]),
+            effect.none())
+        }
+      }
     }
     WsWrapper(ws.OnBinaryMessage(msg)), _ -> {
-      io.println("Received ws message: " <> string.inspect(msg))
+      io.println("Received binary ws message: " <> string.inspect(msg))
       #(model, effect.none())
     }
     WsWrapper(ws.OnClose(reason)), _ -> {
@@ -122,24 +186,89 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 fn view(model: Model) -> Element(Msg) {
   html.div([], [
     html.div([], [
-      html.button([event.on_click(UserClickedRunIrrigation)], [html.text("Run irrigation")]),
+      case model.ws {
+        None -> html.div([
+          attribute.styles([#("color", "red"),
+                            #("font-size", "13px")]),
+          ], [
+            html.text("Disconnected from server")
+          ])
+        Some(_) -> html.div([
+          attribute.styles([#("color", "#0af"),
+                            #("font-size", "13px")]),
+          ], [
+            html.text("Connected to server")
+          ])
+      }
     ]),
-    html.div([], [
-      html.input([attribute.type_("number"),
-                  attribute.value(int.to_string(model.minutes_on)),
-                  event.on_input(UserUpdatedOnTime)]),
-    ]),
-    html.div([], [
-      html.button([event.on_click(UserClickedTurnOffIrrigation)], [html.text("Turn off irrigation")]),
-    ]),
+    html.div([],
+      list.map(dict.to_list(model.solenoids), fn(solenoid_kv) {
+        let #(solenoid_id, solenoid) = solenoid_kv
+        html.div([attribute.styles([
+          #("margin-top", "10px"),
+          #("margin-bottom", "10px"),
+          #("border", "1px solid #444")
+        ])], [
+          html.div([
+            attribute.styles([
+              #("margin", "5px"),
+              #("color", "#444"),
+              #("font-size", "20px"),
+            ])
+          ], [
+            html.text(solenoid.name),
+            case solenoid.on_or_off {
+              None -> html.div([], [])
+              Some(On) -> html.div([
+                attribute.styles([
+                  #("color", "#0af")
+                ])], [
+                  html.text("watering")
+                ])
+              Some(Off) -> html.div([
+                attribute.styles([
+                  #("color", "#666"),
+                ])], [
+                  html.text("off")
+                ])
+            }
+          ]),
+          html.div([attribute.styles([
+            #("display", "flex"),
+            #("flex-direction", "row")
+          ])], [
+            html.div([attribute.styles([
+              #("margin", "10px"),
+            ])], [
+              html.button([event.on_click(UserClickedRunIrrigation(solenoid_id))], [html.text("ON")]),
+            ]),
+            html.div([attribute.styles([#("margin-top", "10px")])], [
+              html.text("for "),
+              html.input([
+                attribute.type_("number"),
+                attribute.value(solenoid.minutes_next),
+                attribute.styles([#("width", "5ch")]),
+                event.on_input(UserUpdatedOnTime(solenoid_id, _)),
+              ]),
+              html.text(" minutes"),
+            ]),
+            html.div([attribute.styles([
+              #("margin", "10px")
+            ])], [
+              html.button([event.on_click(UserClickedTurnOffIrrigation(solenoid_id))], [html.text("OFF")])
+            ]),
+          ])
+        ])
+      })
+    ),
     html.div([], [
       html.textarea([attribute.readonly(True),
                      attribute.styles([
-                       #("width", "800"),
-                       #("height", "400")])],
+                       #("width", "95vw"),
+                       #("height", "30vh")])],
                     string.join(model.messages_rev, "\n"))
-    ]),
-    scheduled_action_form_view(model)
+    ])
+    // scheduled_action_form_view(model)
   ])
 }
 
@@ -220,6 +349,20 @@ fn field_input(
     // Any errors presented below
     ..list.map(errors, fn(msg) { html.small([], [element.text(msg)]) })
   ])
+}
+
+/// Parse "n1s3on" into #(1, 3, On)
+fn parse_message(msg: String) -> Result(#(Int, Int, OnOrOff), Nil) {
+  let n = string.slice(msg, 0, 1)
+  let node_str = string.slice(msg, 1, 1)
+  let s = string.slice(msg, 2, 1)
+  let solenoid_str = string.slice(msg, 3, 1)
+  let state = string.drop_start(msg, 4)
+  case n, int.parse(node_str), s, int.parse(solenoid_str), state {
+    "n", Ok(node_number), "s", Ok(solenoid_number), "on" -> Ok(#(node_number, solenoid_number, On))
+    "n", Ok(node_number), "s", Ok(solenoid_number), "off" -> Ok(#(node_number, solenoid_number, Off))
+    _, _, _, _, _ -> Error(Nil)
+  }
 }
 
 @external(javascript, "./frontend.js", "raise_alert")

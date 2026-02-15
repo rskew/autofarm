@@ -86,7 +86,8 @@ pub fn main() {
         }
       }
       |> mist.new
-      |> mist.bind("localhost")
+      |> mist.bind("0.0.0.0")
+      //|> mist.bind("localhost")
       |> mist.with_ipv6
       |> mist.port(8006)
       |> mist.start
@@ -119,7 +120,7 @@ fn broadcaster_handle_message(state, msg) {
         process.send(sub, ForwardFromBackend(m))
       })
       let messages = case list.length(messages) {
-        a if a > 10 -> case list.rest(messages) {
+        a if a > 50 -> case list.rest(messages) {
           Ok(tail) -> tail
           Error(_) -> []  // Can't happen due to checking the length
         }
@@ -154,7 +155,7 @@ fn handle_ws_message(call_serial) {
         logging.log(logging.Info, "Received text frame: " <> msg)
         // TODO: Handle error from serial
         let assert Ok(_) = case call_serial(msg) {
-          Ok(_) -> mist.send_text_frame(conn, "Message forwarded to gateway")
+          Ok(_) -> mist.send_text_frame(conn, "Message '" <> msg <> "' forwarded to gateway")
           Error(error) -> mist.send_text_frame(conn, "Error forwarding message to gateway: " <> error)
         }
         mist.continue(state)

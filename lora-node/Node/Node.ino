@@ -14,14 +14,13 @@ HammingCode hamming;
 #define rst 14
 #define dio0 2
 
-#define solenoidPin 27
-
-
-String NODE_NAME = "node1hi";
+int NODE_NUMBER = 1;
+int solenoidPins[5] = {27, 26, 25, 33, 32};
 
 struct Action {
-    String nodeName;
-    String onOff;
+    int nodeNumber;
+    int solenoidNumber;
+    bool onOrOff;
     int minutesOn;
 };
 
@@ -31,7 +30,13 @@ Action receivedAction = {};
 void setup() {
   Serial.begin(115200);
   while (!Serial);
-  Serial.print("LoRa Sender\r\n");
+  Serial.print("Node " + String(NODE_NUMBER) + " \r\n");
+
+  for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
+    int pin_index = solenoid_number - 1;
+    pinMode(solenoidPins[pin_index], OUTPUT);
+    digitalWrite(solenoidPins[pin_index], LOW);
+  }
 
   LoRa.setPins(ss, rst, dio0);
   
@@ -41,7 +46,9 @@ void setup() {
   }
   Serial.print("LoRa Initializing OK!\r\n");
 
-  pinMode(solenoidPin, OUTPUT);
+  for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
+    loRaSendMessage("n" + String(NODE_NUMBER) + "s" + String(solenoid_number) + "off");
+  }
 }
 
 void loop() {
@@ -50,31 +57,28 @@ void loop() {
   int rssi;
   int errorsCorrected;
   if (loRaReceiveMessage(receivedMessage, rssi, errorsCorrected)) {
-    Serial.print("Node '" + NODE_NAME + "': "
+    Serial.print("Node '" + String(NODE_NUMBER) + "': "
       + "Received LoRa packet: '" + receivedMessage + "' "
-      + "with RSSI " + rssi + " "
-      + "and " + errorsCorrected + " errors corrected\r\n");
+      + "with RSSI " + String(rssi) + " "
+      + "and " + String(errorsCorrected) + " errors corrected\r\n");
 
     if (!parseMessage(receivedMessage, receivedAction)) {
-      String messageToSend = "Node '" + NODE_NAME + "': "
+      String messageToSend = "Node '" + String(NODE_NUMBER) + "': "
         + "Error parsing message: '" + receivedMessage + "'";
       Serial.print(messageToSend + "\r\n");
-      if (!loRaSendMessage(messageToSend)) {
-        Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
-      }
     } else {
-      if (receivedAction.onOff == "on") {
-        digitalWrite(solenoidPin, HIGH);
-        String messageToSend = "Node '" + NODE_NAME + "': "
-          + "Turned solenoid ON";
+      int pin_index = receivedAction.solenoidNumber - 1;
+      int pin = solenoidPins[pin_index];
+      if (receivedAction.onOrOff) {
+        digitalWrite(pin, HIGH);
+        String messageToSend = "n" + String(NODE_NUMBER) + "s" + String(receivedAction.solenoidNumber) + "on";
         Serial.print(messageToSend + "\r\n");
         if (!loRaSendMessage(messageToSend)) {
           Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
         }
-      } else if (receivedAction.onOff == "off") {
-        digitalWrite(solenoidPin, LOW);
-        String messageToSend = "Node '" + NODE_NAME + "': "
-          + "Turned solenoid OFF";
+      } else {
+        digitalWrite(pin, LOW);
+        String messageToSend = "n" + String(NODE_NUMBER) + "s" + String(receivedAction.solenoidNumber) + "off";
         Serial.print(messageToSend + "\r\n");
         if (!loRaSendMessage(messageToSend)) {
           Serial.print("Failed to send message: '" + messageToSend + "'\r\n");
@@ -85,34 +89,31 @@ void loop() {
 }
 
 bool parseMessage(String message, Action& result) {
-  int firstSpace = message.indexOf(' ');
-  if (firstSpace == -1) {
+  // 012345678
+  // n2s3on 20
+  // n2s3off
+
+  // check message validity
+  if (message.substring(0, 1) != "n"
+    || message.substring(1, 2).toInt() == 0
+    || message.substring(2, 3) != "s"
+    || message.substring(3, 4).toInt() == 0
+    || message.substring(4, 5) != "o"
+    || (message.substring(5, 6) != "n" && message.substring(5, 6) != "f")) {
     return false;
   };
-  String nodeName = message.substring(0, firstSpace);
-  String remainingData = message.substring(firstSpace + 1);
 
-  int secondSpace = remainingData.indexOf(' ');
-  String onOff = "";
-  if (secondSpace == -1) {
-    onOff = remainingData;
+  result.nodeNumber = message.substring(1, 2).toInt();
+  result.solenoidNumber = message.substring(3, 4).toInt();
+  String onOrOffStr = message.substring(5, 6);
+  if (onOrOffStr == "n") {
+    result.onOrOff = true;
+  } else if (onOrOffStr == "f") {
+    result.onOrOff = false;
   } else {
-    onOff = remainingData.substring(0, secondSpace);
+    return false;
   };
-  result.nodeName = nodeName;
-  result.onOff = onOff;
-  if (onOff == "on") {
-    if (secondSpace == -1) {
-      return false;
-    };
-    String minutesOnStr = remainingData.substring(secondSpace + 1);
-    int minutesOn = minutesOnStr.toInt();
-    if (minutesOn == 0) {
-      return false;
-    }
-    result.minutesOn = minutesOn;
-  } else if (onOff == "off") {
-  };
+  result.minutesOn = message.substring(7).toInt();
   return true;
 }
 
@@ -156,7 +157,7 @@ bool decode(byte buffer[], int bufferLength, byte result[], int& errorsCorrected
       };
       result[i] = decoded;
     } else {
-      return "fail";
+      return false;
     }
   };
   result[bufferLength/2] = 0;
