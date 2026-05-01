@@ -5,6 +5,8 @@
 // - https://www.airspayce.com/mikem/arduino/RadioHead/rf95_reliable_datagram_server_8ino-example.html
 #include <SPI.h>
 #include <LoRa.h>
+#include <esp_system.h>
+#include <esp_task_wdt.h>
 
 #include <Hamming.h>
 HammingCode hamming;
@@ -30,8 +32,35 @@ Action receivedAction = {};
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
-  Serial.print("Node " + String(NODE_NUMBER) + " \r\n");
+  // No while(!Serial); the node runs headless in the field.
+
+  // Let supplies settle after a brown-out recovery before touching anything.
+  delay(200);
+
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+  esp_task_wdt_config_t wdt_config = {
+    .timeout_ms = 15000,
+    .idle_core_mask = (1 << 0),
+    .trigger_panic = true,
+  };
+  esp_task_wdt_deinit();
+  esp_task_wdt_init(&wdt_config);
+#else
+  esp_task_wdt_init(15, true);
+#endif
+  esp_task_wdt_add(NULL);
+
+  esp_reset_reason_t reason = esp_reset_reason();
+  Serial.print("Node " + String(NODE_NUMBER)
+               + " boot, reset reason: " + String(reason) + "\r\n");
+
+  // If the last reset was brown-out, deep-sleep to let the solar panel
+  // build some charge instead of immediately retrying and burning it.
+  if (reason == ESP_RST_BROWNOUT) {
+    Serial.print("Brown-out detected, sleeping 30s to recover\r\n");
+    delay(50);
+    esp_deep_sleep(30ULL * 1000000ULL);
+  }
 
   for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
     int index = solenoid_number - 1;
@@ -39,20 +68,43 @@ void setup() {
     digitalWrite(solenoidPins[index], LOW);
   }
 
+  // Hold LoRa in reset long enough to clear any partial-power state.
+  pinMode(rst, OUTPUT);
+  digitalWrite(rst, LOW);
+  delay(20);
+  digitalWrite(rst, HIGH);
+  delay(50);
+
   LoRa.setPins(ss, rst, dio0);
-  
+
+  const int maxLoraAttempts = 20; // ~10s at 500ms
+  int loraAttempts = 0;
   while (!LoRa.begin(915E6)) {
     Serial.print(".");
     delay(500);
+    if (++loraAttempts >= maxLoraAttempts) {
+      Serial.print("LoRa init failed, restarting\r\n");
+      delay(50);
+      ESP.restart();
+    }
   }
   Serial.print("LoRa Initializing OK!\r\n");
 
-  for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
-    loRaSendMessage("n" + String(NODE_NUMBER) + "s" + String(solenoid_number) + "off");
+  // Only broadcast startup state on clean boots so brown-out loops
+  // don't spam the gateway with OFF messages.
+  bool cleanBoot = (reason == ESP_RST_POWERON
+                 || reason == ESP_RST_EXT
+                 || reason == ESP_RST_SW);
+  if (cleanBoot) {
+    for (int solenoid_number = 1; solenoid_number <= 5; solenoid_number++) {
+      loRaSendMessage("n" + String(NODE_NUMBER) + "s" + String(solenoid_number) + "off");
+    }
   }
 }
 
 void loop() {
+  esp_task_wdt_reset();
+
   // Handle messages from gateway
   String receivedMessage = "";
   int rssi;
