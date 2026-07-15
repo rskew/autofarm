@@ -26,6 +26,7 @@ gleam_time = ">= 1.5.0 and < 2.0.0"
 gleam_json = ">= 3.1.0 and < 4.0.0"
 sqlight = ">= 1.0.3 and < 2.0.0"
 shared = { path = "../gleam-shared" }
+gramps = { path = "../gramps" }
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

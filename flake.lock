@@ -2,11 +2,11 @@
   "nodes": {
     "gleam-nixpkgs": {
       "locked": {
-        "lastModified": 1762424912,
-        "narHash": "sha256-9L4djKH5DIBL2pnUwcQjsQrRjUOeHsKv7plx6nL12Z0=",
+        "lastModified": 1779693441,
+        "narHash": "sha256-PI0UWtPOT1OxeBVS5/LEGK9LM3SwyUgrcUXZAi/vU+g=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "550b5f9baa1619097186676736962f9365b71589",
+        "rev": "43b7138226a3e7207c6a23dfb72c6604117a2b0f",
         "type": "github"
       },
       "original": {
