@@ -520,27 +520,21 @@
          ];
       };
 
+      packages.x86_64-linux.gleam-backend-src = gpkgs.runCommand "gleam-backend-src" {} ''
+        mkdir -p $out
+        cp -r ${./gleam-backend}/* $out/
+        chmod -R u+w $out
+        # Fix the local package path to point to the nix store copy
+        substituteInPlace $out/gleam.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
+        substituteInPlace $out/manifest.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
+        substituteInPlace $out/gleam.toml --replace-fail '../gramps' '${./vendored_gramps}'
+        substituteInPlace $out/manifest.toml --replace-fail '../gramps' '${./vendored_gramps}'
+      '';
+
       nixosModules.gleam-backend =
         { lib, config, pkgs, ... }:
         let
-          src = gpkgs.runCommand "gleam-backend-src" {} ''
-            mkdir -p $out
-            cp -r ${./gleam-backend}/* $out/
-            chmod -R u+w $out
-            # Fix the local package path to point to the nix store copy
-            substituteInPlace $out/gleam.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
-            substituteInPlace $out/manifest.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
-            #substituteInPlace $out/gleam.toml --replace-fail '../gramps' '${./gramps}'
-            #substituteInPlace $out/manifest.toml --replace-fail '../gramps' '${./gramps}'
-            mkdir $out/gramps
-            cp -r ${./gramps}/* $out/gramps/
-            if [ ! -e "$out/gramps/gleam.toml" ]; then
-              echo "Error: Gramps submodule content is missing"
-              exit 1
-            fi
-            substituteInPlace $out/gleam.toml --replace-fail '../gramps' './gramps'
-            substituteInPlace $out/manifest.toml --replace-fail '../gramps' './gramps'
-          '';
+          src = packages.x86_64-linux.gleam-backend-src;
           workDir = "/var/lib/gleam-backend";
         in {
           networking.firewall.allowedTCPPorts = [ 8006 ];
