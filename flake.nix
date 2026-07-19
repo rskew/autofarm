@@ -8,7 +8,6 @@
     #purerl.url = "github:purerl/nixpkgs-purerl";
     #purerl.inputs.nixpkgs.follows = "nixpkgs";
     gleam-nixpkgs.url = "github:nixos/nixpkgs";
-    self.submodules = true;
   };
 
   outputs = {
