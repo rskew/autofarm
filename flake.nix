@@ -8,6 +8,7 @@
     #purerl.url = "github:purerl/nixpkgs-purerl";
     #purerl.inputs.nixpkgs.follows = "nixpkgs";
     gleam-nixpkgs.url = "github:nixos/nixpkgs";
+    self.submodules = true;
   };
 
   outputs = {
@@ -531,7 +532,6 @@
             substituteInPlace $out/manifest.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
             substituteInPlace $out/gleam.toml --replace-fail '../gramps' '${./gramps}'
             substituteInPlace $out/manifest.toml --replace-fail '../gramps' '${./gramps}'
-            echo bump cache?
           '';
           workDir = "/var/lib/gleam-backend";
         in {
