@@ -1,11 +1,12 @@
 import formal/form
 import gleam/dict.{type Dict}
+import gleam/dynamic/decode
 import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, Some, None}
-import gleam/pair
+import gleam/order
 import gleam/string
 import gleam/time/calendar
 import gleam/time/duration
@@ -16,6 +17,7 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 import lustre/effect
+import lustre_http
 import lustre_websocket as ws
 import shared/scheduled_action
 import shared/day_of_week.{Monday}
@@ -27,8 +29,29 @@ pub fn main() {
   Nil
 }
 
-type SolenoidState {
-  SolenoidState(
+// The device topology, as loaded from /devices.json at startup. The file at the
+// repo root is the source of truth for which zone is wired to which node and
+// solenoid; nothing here hardcodes it.
+type Device {
+  Device(node: Int, name: String, solenoids: List(SolenoidWiring))
+}
+
+type SolenoidWiring {
+  SolenoidWiring(solenoid: Int, zone: String)
+}
+
+/// A zone's address on the wire: #(node number, solenoid number). Solenoid
+/// numbers repeat across nodes, so the node is needed to key a zone uniquely.
+type ZoneId =
+  #(Int, Int)
+
+/// One controllable zone, flattened out of the topology. The user picks zones
+/// by name and doesn't care which node they hang off, but we keep the address
+/// here so we can talk to the right node.
+type ZoneState {
+  ZoneState(
+    node: Int,
+    solenoid: Int,
     name: String,
     on_or_off: Option(OnOrOff),
     minutes_next: String,
@@ -39,7 +62,8 @@ type SolenoidState {
 type Model {
   Model(
     ws: Option(ws.WebSocket),
-    solenoids: Dict(Int, SolenoidState),
+    zones: Dict(ZoneId, ZoneState),
+    load_error: Option(String),
     messages_rev: List(String),
     scheduled_action_form: form.Form(scheduled_action.ScheduledAction)
   )
@@ -47,42 +71,86 @@ type Model {
 
 fn init(_) -> #(Model, effect.Effect(Msg)) {
   #(Model(ws: None,
-          solenoids: dict.from_list(list.map([
-              #(1, "pumpkins"),
-              #(2, "zucs/poly tunnel"),
-              #(3, "brassica seedlings"),
-              #(4, "flowers"),
-              #(5, "sauce toms"),
-            ], fn(solenoid: #(Int, String)) -> #(Int, SolenoidState) {
-              #(solenoid.0, SolenoidState(name: solenoid.1,
-                              on_or_off: None,
-                              minutes_next: "20",
-                              scheduled_off_at: None))})),
+          zones: dict.new(),
+          load_error: None,
           messages_rev: [],
           scheduled_action_form: scheduled_action_form()),
-    ws.init("/ws", WsWrapper))
+    effect.batch([ws.init("/ws", WsWrapper), fetch_devices()]))
+}
+
+fn fetch_devices() -> effect.Effect(Msg) {
+  lustre_http.get(
+    origin() <> "/devices.json",
+    lustre_http.expect_json(devices_decoder(), DevicesLoaded),
+  )
+}
+
+fn devices_decoder() -> decode.Decoder(List(Device)) {
+  use devices <- decode.field("devices", decode.list(device_decoder()))
+  decode.success(devices)
+}
+
+fn device_decoder() -> decode.Decoder(Device) {
+  use node <- decode.field("node", decode.int)
+  use name <- decode.field("name", decode.string)
+  use solenoids <- decode.field("solenoids", decode.list(solenoid_decoder()))
+  decode.success(Device(node: node, name: name, solenoids: solenoids))
+}
+
+fn solenoid_decoder() -> decode.Decoder(SolenoidWiring) {
+  use solenoid <- decode.field("solenoid", decode.int)
+  use zone <- decode.field("zone", decode.string)
+  decode.success(SolenoidWiring(solenoid: solenoid, zone: zone))
+}
+
+/// Flatten the device topology into the zone list the UI controls.
+fn zones_from_devices(devices: List(Device)) -> Dict(ZoneId, ZoneState) {
+  devices
+  |> list.flat_map(fn(device) {
+    list.map(device.solenoids, fn(wiring) {
+      #(#(device.node, wiring.solenoid),
+        ZoneState(node: device.node,
+                  solenoid: wiring.solenoid,
+                  name: wiring.zone,
+                  on_or_off: None,
+                  minutes_next: "20",
+                  scheduled_off_at: None))
+    })
+  })
+  |> dict.from_list
 }
 
 type Msg {
-  UserClickedRunIrrigation(solenoid_id: Int)
-  UserClickedTurnOffIrrigation(solenoid_id: Int)
-  UserUpdatedOnTime(solenoid_id: Int, on_time: String)
+  UserClickedRunIrrigation(zone_id: ZoneId)
+  UserClickedTurnOffIrrigation(zone_id: ZoneId)
+  UserUpdatedOnTime(zone_id: ZoneId, on_time: String)
   WsWrapper(ws.WebSocketEvent)
+  DevicesLoaded(Result(List(Device), lustre_http.HttpError))
   UserSubmittedScheduledActionForm(form_result: Result(scheduled_action.ScheduledAction, form.Form(scheduled_action.ScheduledAction)))
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   case msg, model.ws {
-    UserClickedRunIrrigation(solenoid_id), Some(socket) -> {
-      case dict.get(model.solenoids, solenoid_id) {
-        Ok(solenoid) -> {
-          case int.parse(solenoid.minutes_next) {
+    DevicesLoaded(Ok(devices)), _ -> {
+      #(Model(..model, zones: zones_from_devices(devices), load_error: None),
+        effect.none())
+    }
+    DevicesLoaded(Error(error)), _ -> {
+      io.println("Failed to load devices.json: " <> string.inspect(error))
+      #(Model(..model, load_error: Some(string.inspect(error))), effect.none())
+    }
+    UserClickedRunIrrigation(zone_id), Some(socket) -> {
+      case dict.get(model.zones, zone_id) {
+        Ok(zone) -> {
+          case int.parse(zone.minutes_next) {
             Ok(minutes_on) -> {
               let seconds_on = minutes_on * 60
-              let payload = "n1s" <> int.to_string(solenoid_id) <> "on " <> int.to_string(seconds_on)
+              let payload = "n" <> int.to_string(zone.node)
+                <> "s" <> int.to_string(zone.solenoid)
+                <> "on " <> int.to_string(seconds_on)
               let scheduled_off_at = timestamp.add(timestamp.system_time(), duration.seconds(seconds_on))
-              let updated_solenoids = dict.insert(model.solenoids, solenoid_id, SolenoidState(..solenoid, scheduled_off_at: Some(scheduled_off_at)))
-              #(Model(..model, solenoids: updated_solenoids), ws.send(socket, payload))
+              let updated_zones = dict.insert(model.zones, zone_id, ZoneState(..zone, scheduled_off_at: Some(scheduled_off_at)))
+              #(Model(..model, zones: updated_zones), ws.send(socket, payload))
             }
             Error(_) -> {
               alert("Invalid on duration")
@@ -96,16 +164,18 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
         }
       }
     }
-    UserClickedRunIrrigation(_solenoid_number), None -> {
+    UserClickedRunIrrigation(_zone_id), None -> {
       let _ = alert("Disconnected from server, cannot start irrigation")
       #(model, effect.none())
     }
-    UserClickedTurnOffIrrigation(solenoid_id), Some(socket) -> {
-      case dict.get(model.solenoids, solenoid_id) {
-        Ok(solenoid) -> {
-          let payload = "n1s" <> int.to_string(solenoid_id) <> "off"
-          let updated_solenoids = dict.insert(model.solenoids, solenoid_id, SolenoidState(..solenoid, scheduled_off_at: None))
-          #(Model(..model, solenoids: updated_solenoids), ws.send(socket, payload))
+    UserClickedTurnOffIrrigation(zone_id), Some(socket) -> {
+      case dict.get(model.zones, zone_id) {
+        Ok(zone) -> {
+          let payload = "n" <> int.to_string(zone.node)
+            <> "s" <> int.to_string(zone.solenoid)
+            <> "off"
+          let updated_zones = dict.insert(model.zones, zone_id, ZoneState(..zone, scheduled_off_at: None))
+          #(Model(..model, zones: updated_zones), ws.send(socket, payload))
         }
         Error(_) -> {
           alert("Failed to turn off irrigation!")
@@ -113,16 +183,16 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
         }
       }
     }
-    UserClickedTurnOffIrrigation(_solenoid_number), None -> {
+    UserClickedTurnOffIrrigation(_zone_id), None -> {
       let _ = alert("Disconnected from server, cannot turn off irrigation")
       #(model, effect.none())
     }
-    UserUpdatedOnTime(solenoid_id, on_time), _ -> {
-      case dict.get(model.solenoids, solenoid_id) {
-        Ok(solenoid) -> {
-          let updated_solenoids = dict.insert(model.solenoids, solenoid_id,
-                                              SolenoidState(..solenoid, minutes_next: on_time))
-          #(Model(..model, solenoids: updated_solenoids), effect.none())
+    UserUpdatedOnTime(zone_id, on_time), _ -> {
+      case dict.get(model.zones, zone_id) {
+        Ok(zone) -> {
+          let updated_zones = dict.insert(model.zones, zone_id,
+                                          ZoneState(..zone, minutes_next: on_time))
+          #(Model(..model, zones: updated_zones), effect.none())
         }
         Error(_) -> {
           #(model, effect.none())
@@ -154,15 +224,16 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     WsWrapper(ws.OnTextMessage(msg)), _ -> {
       io.println("Received ws message: " <> msg)
       case parse_message(msg) {
-        Ok(#(_node_number, solenoid_number, on_or_off)) -> {
-          case dict.get(model.solenoids, solenoid_number) {
-            Ok(solenoid) -> {
-              let new_solenoid_state = case on_or_off {
-                On -> SolenoidState(..solenoid, on_or_off: Some(On))
-                Off -> SolenoidState(..solenoid, on_or_off: Some(Off), scheduled_off_at: None)
+        Ok(#(node_number, solenoid_number, on_or_off)) -> {
+          let zone_id = #(node_number, solenoid_number)
+          case dict.get(model.zones, zone_id) {
+            Ok(zone) -> {
+              let new_zone_state = case on_or_off {
+                On -> ZoneState(..zone, on_or_off: Some(On))
+                Off -> ZoneState(..zone, on_or_off: Some(Off), scheduled_off_at: None)
               }
-              let updated_solenoids = dict.insert(model.solenoids, solenoid_number, new_solenoid_state)
-              #(Model(..model, solenoids: updated_solenoids), effect.none())
+              let updated_zones = dict.insert(model.zones, zone_id, new_zone_state)
+              #(Model(..model, zones: updated_zones), effect.none())
             }
             Error(_) -> #(model, effect.none())
           }
@@ -184,8 +255,17 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   }
 }
 
+/// Zones are shown as one flat list, ordered by node then solenoid so the
+/// order is stable and matches the order they're declared in devices.json.
+fn compare_zones(a: ZoneState, b: ZoneState) -> order.Order {
+  case int.compare(a.node, b.node) {
+    order.Eq -> int.compare(a.solenoid, b.solenoid)
+    other -> other
+  }
+}
+
 fn view(model: Model) -> Element(Msg) {
-  let solenoids = list.sort(dict.to_list(model.solenoids), fn(a, b) {int.compare(a.0, b.0)})
+  let zones = list.sort(dict.values(model.zones), compare_zones)
   html.div([
     attribute.styles([
       #("font-family", "sans")
@@ -207,73 +287,22 @@ fn view(model: Model) -> Element(Msg) {
           ])
       }
     ]),
-    html.div([],
-      list.map(solenoids, fn(solenoid_kv) {
-        let #(solenoid_id, solenoid) = solenoid_kv
-        let colour = case solenoid.on_or_off {
-          Some(On) -> "#0af"
-          Some(Off) -> "#777"
-          None -> "#ccc"
-        }
-        html.div([attribute.styles([
-          #("margin-top", "10px"),
-          #("margin-bottom", "10px"),
-          #("border", "2px solid " <> colour)
-        ])], [
-          html.div([
-            attribute.styles([
-              #("margin", "5px"),
-              #("color", "#444"),
-              #("font-size", "20px"),
-              #("display", "flex"),
-              #("flex-direction", "row")
-            ])
-          ], [
-            html.text(solenoid.name),
-            case solenoid.on_or_off {
-              None -> html.div([], [])
-              Some(On) -> html.div([
-                attribute.styles([
-                  #("color", colour), #("margin-left", "10px")
-                ])], [
-                  html.text("watering")
-                ])
-              Some(Off) -> html.div([
-                attribute.styles([
-                  #("color", colour), #("margin-left", "10px")
-                ])], [
-                  html.text("off")
-                ])
-            }
-          ]),
-          html.div([attribute.styles([
-            #("display", "flex"),
-            #("flex-direction", "row")
-          ])], [
-            html.div([attribute.styles([
-              #("margin", "10px"),
-            ])], [
-              html.button([event.on_click(UserClickedRunIrrigation(solenoid_id))], [html.text("ON")]),
-            ]),
-            html.div([attribute.styles([#("margin-top", "10px")])], [
-              html.text("for "),
-              html.input([
-                attribute.type_("number"),
-                attribute.value(solenoid.minutes_next),
-                attribute.styles([#("width", "5ch")]),
-                event.on_input(UserUpdatedOnTime(solenoid_id, _)),
-              ]),
-              html.text(" minutes"),
-            ]),
-            html.div([attribute.styles([
-              #("margin", "10px")
-            ])], [
-              html.button([event.on_click(UserClickedTurnOffIrrigation(solenoid_id))], [html.text("OFF")])
-            ]),
-          ])
+    case model.load_error, zones {
+      Some(error), _ -> html.div([
+        attribute.styles([#("color", "red"),
+                          #("margin-top", "10px")])
+        ], [
+          html.text("Couldn't load devices.json: " <> error)
         ])
-      })
-    ),
+      None, [] -> html.div([
+        attribute.styles([#("color", "#777"),
+                          #("margin-top", "10px")])
+        ], [
+          html.text("Loading zones...")
+        ])
+      None, _ -> html.div([], [])
+    },
+    html.div([], list.map(zones, zone_view)),
     html.div([], [
       html.textarea([attribute.readonly(True),
                      attribute.styles([
@@ -282,6 +311,78 @@ fn view(model: Model) -> Element(Msg) {
                     string.join(model.messages_rev, "\n"))
     ])
     // scheduled_action_form_view(model)
+  ])
+}
+
+fn zone_view(zone: ZoneState) -> Element(Msg) {
+  let zone_id = #(zone.node, zone.solenoid)
+  let colour = case zone.on_or_off {
+    Some(On) -> "#0af"
+    Some(Off) -> "#777"
+    None -> "#ccc"
+  }
+  html.div([attribute.data("zone", zone.name),
+            attribute.styles([
+    #("margin-top", "10px"),
+    #("margin-bottom", "10px"),
+    #("border", "2px solid " <> colour)
+  ])], [
+    html.div([
+      attribute.styles([
+        #("margin", "5px"),
+        #("color", "#444"),
+        #("font-size", "20px"),
+        #("display", "flex"),
+        #("flex-direction", "row")
+      ])
+    ], [
+      html.text(zone.name),
+      case zone.on_or_off {
+        None -> html.div([attribute.data("state", "unknown")], [])
+        Some(On) -> html.div([
+          attribute.data("state", "on"),
+          attribute.styles([
+            #("color", colour), #("margin-left", "10px")
+          ])], [
+            html.text("watering")
+          ])
+        Some(Off) -> html.div([
+          attribute.data("state", "off"),
+          attribute.styles([
+            #("color", colour), #("margin-left", "10px")
+          ])], [
+            html.text("off")
+          ])
+      }
+    ]),
+    html.div([attribute.styles([
+      #("display", "flex"),
+      #("flex-direction", "row")
+    ])], [
+      html.div([attribute.styles([
+        #("margin", "10px"),
+      ])], [
+        html.button([attribute.data("action", "on"),
+                     event.on_click(UserClickedRunIrrigation(zone_id))], [html.text("ON")]),
+      ]),
+      html.div([attribute.styles([#("margin-top", "10px")])], [
+        html.text("for "),
+        html.input([
+          attribute.type_("number"),
+          attribute.data("field", "minutes"),
+          attribute.value(zone.minutes_next),
+          attribute.styles([#("width", "5ch")]),
+          event.on_input(UserUpdatedOnTime(zone_id, _)),
+        ]),
+        html.text(" minutes"),
+      ]),
+      html.div([attribute.styles([
+        #("margin", "10px")
+      ])], [
+        html.button([attribute.data("action", "off"),
+                     event.on_click(UserClickedTurnOffIrrigation(zone_id))], [html.text("OFF")])
+      ]),
+    ])
   ])
 }
 
@@ -380,3 +481,6 @@ fn parse_message(msg: String) -> Result(#(Int, Int, OnOrOff), Nil) {
 
 @external(javascript, "./frontend.js", "raise_alert")
 fn alert(msg: String) -> Nil
+
+@external(javascript, "./frontend.js", "origin")
+fn origin() -> String

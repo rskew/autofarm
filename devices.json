@@ -1,0 +1,22 @@
+{
+  "devices": [
+    {
+      "node": 1,
+      "name": "Poly tunnel",
+      "solenoids": [
+        { "solenoid": 1, "zone": "pumpkins" },
+        { "solenoid": 2, "zone": "zucs/poly tunnel" },
+        { "solenoid": 3, "zone": "brassica seedlings" },
+        { "solenoid": 4, "zone": "flowers" },
+        { "solenoid": 5, "zone": "sauce toms" }
+      ]
+    },
+    {
+      "node": 2,
+      "name": "Greenhouse",
+      "solenoids": [
+        { "solenoid": 1, "zone": "greenhouse" }
+      ]
+    }
+  ]
+}

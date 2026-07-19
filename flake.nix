@@ -586,6 +586,26 @@
           EOF
         '';
       };
+      devShells.x86_64-linux.e2e = gpkgs.mkShell {
+        packages = [
+          gpkgs.playwright-test
+          gpkgs.nodejs
+        ];
+        # Use the browsers from nixpkgs rather than letting playwright download
+        # its own; the versions are matched to playwright-test.
+        PLAYWRIGHT_BROWSERS_PATH = "${gpkgs.playwright-driver.browsers}";
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+        shellHook = ''
+          cd e2e
+          cat <<EOF
+            Build the frontend first (in the 'gleam-frontend' shell), then:
+              playwright test
+
+            The backend is started automatically and serves the frontend and
+            devices.json. It does not need the LoRa gateway plugged in.
+          EOF
+        '';
+      };
       devShells.x86_64-linux.gleam-frontend = gpkgs.mkShell {
         packages = [
           gpkgs.gleam

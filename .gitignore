@@ -3,3 +3,4 @@ pgbackrest.conf
 asdf.md
 /lora-node/asdfarduinobackup
 /result*
+.container-state

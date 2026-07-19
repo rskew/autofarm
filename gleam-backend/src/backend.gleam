@@ -232,6 +232,7 @@ fn guess_content_type(path: String) -> String {
   case string.reverse(path) {
     "sjm." <> _ | "sj." <> _ -> "text/javascript"
     "lmth." <> _ -> "text/html"
+    "nosj." <> _ -> "application/json"
     _ -> "application/octet-stream"
   }
 }
