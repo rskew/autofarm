@@ -529,6 +529,8 @@
             # Fix the local package path to point to the nix store copy
             substituteInPlace $out/gleam.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
             substituteInPlace $out/manifest.toml --replace-fail '../gleam-shared' '${./gleam-shared}'
+            substituteInPlace $out/gleam.toml --replace-fail '../gramps' '${./gramps}'
+            substituteInPlace $out/manifest.toml --replace-fail '../gramps' '${./gramps}'
           '';
           workDir = "/var/lib/gleam-backend";
         in {
